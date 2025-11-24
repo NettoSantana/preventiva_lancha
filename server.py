@@ -17,7 +17,11 @@ def get_token():
     now = int(time.time())
     signature = md5(md5(PASSWORD) + str(now))
     url = f"{BASE_URL}/api/authorization"
-    r = requests.get(url, params={"time": now, "account": ACCOUNT, "signature": signature}, timeout=10)
+    r = requests.get(
+        url,
+        params={"time": now, "account": ACCOUNT, "signature": signature},
+        timeout=10
+    )
     r.raise_for_status()
     j = r.json()
     if j.get("code") != 0:
@@ -75,14 +79,25 @@ def get_ativo_atual():
         for a in ativos:
             if a["id"] == ativo_id:
                 return a
-    # fallback: primeiro
     db["ativo_atual_id"] = ativos[0]["id"]
     save_db(db)
     return ativos[0]
 
 def ensure_defaults_for_ativo(ativo):
+    # plano preventivo default
     if "plano_preventivo" not in ativo or not isinstance(ativo["plano_preventivo"], list):
         ativo["plano_preventivo"] = DEFAULT_PLANO_HORAS if ativo["medida_base"] == "hora" else DEFAULT_PLANO_KM
+
+    # base cumulativa (manual)
+    ativo.setdefault("horas_base_total", 0.0)  # usado quando medida_base = hora
+    ativo.setdefault("km_base_total", 0.0)     # usado quando medida_base = km
+
+    # estado de horas paradas (persistido)
+    ativo.setdefault("paradas_state", {
+        "last_ts": 0,
+        "last_motor": False,
+        "acc_s": 0
+    })
 
 # =========================
 #  LÓGICA DE PREVENTIVA
@@ -135,7 +150,7 @@ def obter_dados_brasilsat_por_imei(imei: str):
     acctime_s = int(data.get("acctime") or 0)
     horas_reais = round(acctime_s / 3600.0, 2)
 
-    # mileage vem em METROS. km_total = mileage / 1000
+    # mileage geralmente vem em metros -> converter pra km
     mileage_m = float(data.get("mileage") or 0)
     km_total = round(mileage_m / 1000.0, 2)
 
@@ -145,14 +160,44 @@ def obter_dados_brasilsat_por_imei(imei: str):
         "horas_reais": horas_reais,
         "km_reais": km_total,
         "tensao_bateria": float(data.get("externalpower") or 0),
-        "servertime": data.get("servertime"),
+        "servertime": int(data.get("servertime") or time.time()),
     }
+
+# =========================
+#  HORAS PARADAS (zera ao ligar)
+# =========================
+def atualizar_horas_paradas(ativo, servertime: int, motor_ligado: bool):
+    st = ativo.get("paradas_state") or {}
+    last_ts = int(st.get("last_ts") or 0)
+    last_motor = bool(st.get("last_motor") or False)
+    acc_s = int(st.get("acc_s") or 0)
+
+    # init quando não tinha estado
+    if last_ts == 0:
+        last_ts = servertime
+        last_motor = motor_ligado
+        acc_s = 0
+
+    if (not last_motor) and (not motor_ligado):
+        delta = max(0, servertime - last_ts)
+        acc_s += delta
+
+    if (not last_motor) and motor_ligado:
+        acc_s = 0  # zera quando liga
+
+    st["last_ts"] = servertime
+    st["last_motor"] = motor_ligado
+    st["acc_s"] = acc_s
+    ativo["paradas_state"] = st
+
+    return round(acc_s / 3600.0, 2)
 
 # =========================
 #  ROTAS
 # =========================
 @app.get("/")
 def dashboard():
+    # dashboard.html na mesma pasta
     return send_from_directory(".", "dashboard.html")
 
 # -------- ATIVOS (CRUD) --------
@@ -186,7 +231,10 @@ def add_ativo():
         "imei": imei,
         "medida_base": medida_base,
         "offset": offset,
-        "plano_preventivo": DEFAULT_PLANO_HORAS if medida_base == "hora" else DEFAULT_PLANO_KM
+        "plano_preventivo": DEFAULT_PLANO_HORAS if medida_base == "hora" else DEFAULT_PLANO_KM,
+        "horas_base_total": 0.0,
+        "km_base_total": 0.0,
+        "paradas_state": {"last_ts": 0, "last_motor": False, "acc_s": 0}
     }
 
     db.setdefault("ativos", []).append(ativo)
@@ -246,14 +294,22 @@ def dados():
     horas_ajustadas = round(bs["horas_reais"] + (ativo["offset"] if ativo["medida_base"] == "hora" else 0), 2)
     km_ajustados = round(bs["km_reais"] + (ativo["offset"] if ativo["medida_base"] == "km" else 0), 2)
 
+    # horas paradas por ativo (zera ao ligar)
+    horas_paradas = atualizar_horas_paradas(ativo, bs["servertime"], bs["motor_ligado"])
+
+    # totais cumulativos por ativo (manual + brasilsat ajustado)
     if ativo["medida_base"] == "hora":
+        horas_totais = round(float(ativo.get("horas_base_total", 0.0)) + horas_ajustadas, 2)
         uso_base = horas_ajustadas
         unidade_base = "h"
     else:
+        km_totais = round(float(ativo.get("km_base_total", 0.0)) + km_ajustados, 2)
         uso_base = km_ajustados
         unidade_base = "km"
 
-    return jsonify({
+    save_db(db)
+
+    payload = {
         "ativo_id": ativo["id"],
         "nome": ativo["nome"],
         "tipo": ativo["tipo"],
@@ -272,7 +328,19 @@ def dados():
         "uso_base": uso_base,
         "unidade_base": unidade_base,
         "medida_base": ativo["medida_base"],
-    })
+
+        # novos campos
+        "horas_paradas": horas_paradas
+    }
+
+    if ativo["medida_base"] == "hora":
+        payload["horas_totais"] = horas_totais
+        payload["horas_base_total"] = float(ativo.get("horas_base_total", 0.0))
+    else:
+        payload["km_totais"] = km_totais
+        payload["km_base_total"] = float(ativo.get("km_base_total", 0.0))
+
+    return jsonify(payload)
 
 # -------- PREVENTIVA (ativo atual) --------
 @app.get("/preventiva")
@@ -364,6 +432,111 @@ def set_plano():
     ativo["plano_preventivo"] = novo
     save_db(db)
     return jsonify({"mensagem": "Plano atualizado", "total_itens": len(novo)})
+
+# -------- NOVO: CONFIG HORAS TOTAIS (ativo hora) --------
+@app.get("/config/horas_totais")
+def get_horas_totais():
+    ativo = get_ativo_atual()
+    if not ativo:
+        return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+    ensure_defaults_for_ativo(ativo)
+
+    if ativo["medida_base"] != "hora":
+        return jsonify({"erro": "Ativo atual não é por horas"}), 400
+
+    bs = obter_dados_brasilsat_por_imei(ativo["imei"])
+    horas_ajustadas = round(bs["horas_reais"] + ativo["offset"], 2)
+    horas_totais = round(float(ativo["horas_base_total"]) + horas_ajustadas, 2)
+
+    return jsonify({
+        "horas_totais": horas_totais,
+        "horas_base_total": float(ativo["horas_base_total"]),
+        "horas_motor_atual": horas_ajustadas
+    })
+
+@app.post("/config/horas_totais")
+def set_horas_totais():
+    ativo = get_ativo_atual()
+    if not ativo:
+        return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+    ensure_defaults_for_ativo(ativo)
+
+    if ativo["medida_base"] != "hora":
+        return jsonify({"erro": "Ativo atual não é por horas"}), 400
+
+    data = request.json or {}
+    horas_totais = data.get("horas_totais")
+    if horas_totais is None:
+        return jsonify({"erro": "Envie horas_totais no corpo JSON"}), 400
+    try:
+        horas_totais = float(horas_totais)
+    except:
+        return jsonify({"erro": "horas_totais deve ser número"}), 400
+
+    bs = obter_dados_brasilsat_por_imei(ativo["imei"])
+    horas_ajustadas = round(bs["horas_reais"] + ativo["offset"], 2)
+
+    # base = total_digitado - horas_motor_atual
+    ativo["horas_base_total"] = round(horas_totais - horas_ajustadas, 2)
+    save_db(db)
+
+    return jsonify({
+        "mensagem": "Horas totais atualizadas",
+        "horas_totais": horas_totais,
+        "horas_base_total": float(ativo["horas_base_total"])
+    })
+
+# -------- NOVO: CONFIG KM TOTAIS (ativo km) --------
+@app.get("/config/km_totais")
+def get_km_totais():
+    ativo = get_ativo_atual()
+    if not ativo:
+        return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+    ensure_defaults_for_ativo(ativo)
+
+    if ativo["medida_base"] != "km":
+        return jsonify({"erro": "Ativo atual não é por km"}), 400
+
+    bs = obter_dados_brasilsat_por_imei(ativo["imei"])
+    km_ajustados = round(bs["km_reais"] + ativo["offset"], 2)
+    km_totais = round(float(ativo["km_base_total"]) + km_ajustados, 2)
+
+    return jsonify({
+        "km_totais": km_totais,
+        "km_base_total": float(ativo["km_base_total"]),
+        "km_total_atual": km_ajustados
+    })
+
+@app.post("/config/km_totais")
+def set_km_totais():
+    ativo = get_ativo_atual()
+    if not ativo:
+        return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+    ensure_defaults_for_ativo(ativo)
+
+    if ativo["medida_base"] != "km":
+        return jsonify({"erro": "Ativo atual não é por km"}), 400
+
+    data = request.json or {}
+    km_totais = data.get("km_totais")
+    if km_totais is None:
+        return jsonify({"erro": "Envie km_totais no corpo JSON"}), 400
+    try:
+        km_totais = float(km_totais)
+    except:
+        return jsonify({"erro": "km_totais deve ser número"}), 400
+
+    bs = obter_dados_brasilsat_por_imei(ativo["imei"])
+    km_ajustados = round(bs["km_reais"] + ativo["offset"], 2)
+
+    ativo["km_base_total"] = round(km_totais - km_ajustados, 2)
+    save_db(db)
+
+    return jsonify({
+        "mensagem": "KM totais atualizados",
+        "km_totais": km_totais,
+        "km_base_total": float(ativo["km_base_total"])
+    })
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
