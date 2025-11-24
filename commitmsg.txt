@@ -1,0 +1,1 @@
+﻿deploy: primeira versão painel preventiva lancha (Flask + BrasilSat + dashboard + config)

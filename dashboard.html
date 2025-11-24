@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Painel Interno — Preventiva Náutica</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{
+      --bg:#0b1020; --bg2:#0f172a; --card:#121a2e; --card2:#0f172b;
+      --ink:#e5e7eb; --muted:#94a3b8; --accent:#38bdf8;
+      --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --line:#1f2a44;
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background: radial-gradient(1200px 700px at 20% -10%, #12214a 0%, transparent 70%),
+                  radial-gradient(1400px 800px at 120% 10%, #0b3a55 0%, transparent 60%),
+                  linear-gradient(180deg,var(--bg),var(--bg2));
+      color:var(--ink);
+    }
+    .wrap{max-width:1200px;margin:28px auto;padding:0 16px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap}
+    .title{display:flex;gap:12px;align-items:center}
+    .logo{
+      width:44px;height:44px;border-radius:12px;
+      background:linear-gradient(135deg,#0ea5e9,#22c55e);
+      display:grid;place-items:center;color:#001827;font-weight:900;
+      box-shadow:0 10px 30px rgba(56,189,248,.25);
+    }
+    h1{margin:0;font-size:22px;letter-spacing:.3px}
+    .sub{color:var(--muted);font-size:13px;margin-top:2px}
+    .pill{
+      padding:6px 10px;border-radius:999px;font-size:12px;
+      background:#0a1325;border:1px solid var(--line);color:var(--muted);
+    }
+    .btn{
+      padding:8px 12px;border-radius:10px;border:1px solid var(--line);
+      background:#0a1325;color:var(--ink);cursor:pointer;font-size:13px;
+    }
+    .btn.active{border-color:rgba(56,189,248,.5); color:var(--accent)}
+    .grid{display:grid;gap:14px;grid-template-columns:repeat(12,1fr);}
+    .card{
+      background:linear-gradient(180deg,var(--card),var(--card2));
+      border:1px solid var(--line);
+      border-radius:var(--radius); padding:16px;
+      box-shadow:0 6px 18px rgba(0,0,0,.35);
+    }
+    .card h2{
+      margin:0 0 8px;font-size:14px;font-weight:700;color:var(--accent);
+      letter-spacing:.4px;text-transform:uppercase;
+    }
+    .kpi{font-size:30px;font-weight:800;margin:6px 0}
+    .muted{color:var(--muted);font-size:13px}
+    .status{display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px}
+    .dot{width:10px;height:10px;border-radius:999px;background:var(--muted);box-shadow:0 0 0 4px rgba(148,163,184,.12);}
+    .dot.ok{background:var(--ok);box-shadow:0 0 0 4px rgba(34,197,94,.12)}
+    .dot.warn{background:var(--warn);box-shadow:0 0 0 4px rgba(245,158,11,.12)}
+    .dot.bad{background:var(--bad);box-shadow:0 0 0 4px rgba(239,68,68,.12)}
+    .badge{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:4px 8px;border-radius:10px;border:1px solid var(--line);
+      font-size:12px;color:var(--muted);
+    }
+    .badge.ok{color:var(--ok);border-color:rgba(34,197,94,.35)}
+    .badge.warn{color:var(--warn);border-color:rgba(245,158,11,.35)}
+    .badge.bad{color:var(--bad);border-color:rgba(239,68,68,.35)}
+    .col-4{grid-column:span 4}
+    .col-5{grid-column:span 5}
+    .col-7{grid-column:span 7}
+    .col-8{grid-column:span 8}
+    .col-12{grid-column:span 12}
+    @media(max-width:900px){.col-4,.col-5,.col-7,.col-8{grid-column:span 12}}
+    canvas{width:100% !important;}
+    .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+    .table{width:100%;border-collapse:collapse;margin-top:6px;font-size:13px;}
+    .table th,.table td{border-bottom:1px solid var(--line);padding:8px;text-align:left;}
+    .table th{color:var(--muted);font-weight:600}
+    .right{text-align:right}
+    input{
+      width:100%; padding:8px; border-radius:8px; border:1px solid var(--line);
+      background:#0a1325; color:var(--ink); outline:none;
+    }
+    label{font-size:12px;color:var(--muted)}
+    .hide{display:none !important;}
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="title">
+      <div class="logo">PN</div>
+      <div>
+        <h1>Painel Interno — Preventiva Náutica</h1>
+        <div class="sub">BrasilSat → API → Flask → Dashboard (uso interno)</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <button class="btn active" id="tabPainel">Painel</button>
+      <button class="btn" id="tabPreventiva">Preventiva</button>
+      <div class="pill" id="lastUpdate">Última atualização: --</div>
+      <div class="pill">IMEI: <span id="imei">--</span></div>
+    </div>
+  </header>
+
+  <!-- =======================
+       PAINEL PRINCIPAL
+  ======================== -->
+  <section id="viewPainel" class="grid">
+    <div class="card col-4">
+      <h2>Horas de Motor (Horímetro)</h2>
+      <div class="kpi" id="horasMotor">-- h</div>
+      <div class="muted">Horas ajustadas (BrasilSat + offset)</div>
+    </div>
+
+    <div class="card col-4">
+      <h2>Status do Motor</h2>
+      <div class="kpi" id="motorStatus">--</div>
+      <div class="status">
+        <div class="dot" id="motorDot"></div>
+        <div class="muted" id="motorHint">--</div>
+      </div>
+    </div>
+
+    <div class="card col-4">
+      <h2>Tensão da Bateria</h2>
+      <div class="kpi" id="tensao">-- V</div>
+      <div class="badge" id="tensaoBadge">--</div>
+      <div class="muted" style="margin-top:6px">
+        &lt;12.0V baixa | 12.0–12.5V ok parado | &gt;13.2V carregando
+      </div>
+    </div>
+
+    <div class="card col-5">
+      <h2>Próxima troca de óleo</h2>
+      <div class="kpi"><span id="restanteOleo">--</span> h</div>
+      <div class="muted">Ciclo padrão: 100h</div>
+    </div>
+
+    <div class="card col-7">
+      <h2>Alertas</h2>
+      <div id="alertas" class="muted">--</div>
+    </div>
+
+    <div class="card col-8">
+      <div class="row">
+        <h2 style="margin:0">Tensão (histórico interno)</h2>
+        <div class="pill">Janela: <span id="janela">60</span> leituras</div>
+      </div>
+      <canvas id="chartTensao" height="140"></canvas>
+    </div>
+
+    <div class="card col-4">
+      <div class="row">
+        <h2 style="margin:0">Leituras recentes</h2>
+        <button id="clearHistory" class="pill" style="cursor:pointer;border:none">limpar histórico</button>
+      </div>
+      <table class="table" id="logs">
+        <thead><tr><th>Hora</th><th class="right">V</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- =======================
+       VIEW PREVENTIVA (CONFIG)
+  ======================== -->
+  <section id="viewPreventiva" class="grid hide">
+    <div class="card col-12">
+      <div class="row">
+        <h2 style="margin:0">Plano de Preventiva (por horas)</h2>
+        <button class="btn" id="btnSalvarPlano">Salvar plano</button>
+      </div>
+      <div class="muted">Cadastre as tarefas conforme o manual do motor.</div>
+    </div>
+
+    <div class="card col-12">
+      <div class="row" style="gap:14px; align-items:flex-end;">
+        <div style="flex:2; min-width:220px">
+          <label>Nome da tarefa</label>
+          <input id="inpNome" placeholder="Ex.: Troca de óleo do motor"/>
+        </div>
+        <div style="flex:1; min-width:140px">
+          <label>Primeira execução (h)</label>
+          <input id="inpPrimeira" type="number" step="0.1" placeholder="100"/>
+        </div>
+        <div style="flex:1; min-width:140px">
+          <label>Intervalo (h)</label>
+          <input id="inpIntervalo" type="number" step="0.1" placeholder="100"/>
+        </div>
+        <div style="flex:1; min-width:140px">
+          <label>Avisar antes (h)</label>
+          <input id="inpAvisar" type="number" step="0.1" placeholder="10"/>
+        </div>
+        <div>
+          <button class="btn" id="btnAdicionar">Adicionar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card col-12">
+      <h2>Itens cadastrados</h2>
+      <table class="table" id="tblPlano">
+        <thead>
+          <tr>
+            <th>Tarefa</th>
+            <th class="right">1ª Exec (h)</th>
+            <th class="right">Intervalo (h)</th>
+            <th class="right">Avisar (h)</th>
+            <th class="right">Ações</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="muted" id="planoMsg" style="margin-top:8px"></div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  const ENDPOINT_DADOS = "/dados";
+  const ENDPOINT_PLANO = "/config/plano";
+  const MAX_POINTS = 60;
+
+  // ===========================
+  // NAVEGAÇÃO (Painel / Preventiva)
+  // ===========================
+  const tabPainel = document.getElementById("tabPainel");
+  const tabPreventiva = document.getElementById("tabPreventiva");
+  const viewPainel = document.getElementById("viewPainel");
+  const viewPreventiva = document.getElementById("viewPreventiva");
+
+  function showPainel(){
+    tabPainel.classList.add("active");
+    tabPreventiva.classList.remove("active");
+    viewPainel.classList.remove("hide");
+    viewPreventiva.classList.add("hide");
+  }
+  function showPreventiva(){
+    tabPreventiva.classList.add("active");
+    tabPainel.classList.remove("active");
+    viewPreventiva.classList.remove("hide");
+    viewPainel.classList.add("hide");
+    carregarPlano();
+  }
+  tabPainel.onclick = showPainel;
+  tabPreventiva.onclick = showPreventiva;
+
+  // ===========================
+  // HISTÓRICO TENSÃO LOCAL
+  // ===========================
+  const storeKey = "preventiva_hist_tensao_v1";
+  let hist = JSON.parse(localStorage.getItem(storeKey) || "[]");
+  function saveHist(){ localStorage.setItem(storeKey, JSON.stringify(hist)); }
+  function fmtTime(ts){
+    try{ return new Date(ts*1000).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",second:"2-digit"}); }
+    catch(e){ return "--"; }
+  }
+  function tensaoClass(v, motorLigado){
+    if (v < 12.0) return "bad";
+    if (motorLigado && v < 13.2) return "warn";
+    if (!motorLigado && v < 12.3) return "warn";
+    return "ok";
+  }
+  function tensaoLabel(v, motorLigado){
+    if (v < 12.0) return "Bateria baixa";
+    if (motorLigado && v < 13.2) return "Não carregando bem";
+    if (!motorLigado && v < 12.3) return "Meia carga";
+    return "Normal";
+  }
+
+  const chart = new Chart(document.getElementById("chartTensao"), {
+    type:"line",
+    data:{ labels: hist.map(p=>p.t), datasets:[{label:"Tensão (V)", data: hist.map(p=>p.v), tension:.25, pointRadius:2}]},
+    options:{ responsive:true, animation:false, scales:{y:{suggestedMin:10.5,suggestedMax:14.8}}, plugins:{legend:{labels:{color:"#94a3b8"}}}}
+  });
+
+  function renderLogs(){
+    const tbody = document.querySelector("#logs tbody");
+    tbody.innerHTML = "";
+    hist.slice(-10).reverse().forEach(p=>{
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${p.t}</td><td class="right">${p.v.toFixed(2)}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  function pushPoint(v, servertime){
+    hist.push({t:fmtTime(servertime), v, servertime});
+    if (hist.length > MAX_POINTS) hist = hist.slice(-MAX_POINTS);
+    saveHist();
+    chart.data.labels = hist.map(p=>p.t);
+    chart.data.datasets[0].data = hist.map(p=>p.v);
+    chart.update();
+    document.getElementById("janela").textContent = MAX_POINTS;
+    renderLogs();
+  }
+  document.getElementById("clearHistory").onclick = ()=>{
+    hist=[]; saveHist();
+    chart.data.labels=[]; chart.data.datasets[0].data=[]; chart.update();
+    renderLogs();
+  };
+
+  function setAlertas(arr){
+    const el = document.getElementById("alertas");
+    el.innerHTML = arr.length ? arr.map(a=>`• ${a}`).join("<br>") : "Sem alertas no momento.";
+  }
+
+  async function refreshPainel(){
+    const r = await fetch(ENDPOINT_DADOS, {cache:"no-store"});
+    const d = await r.json();
+
+    document.getElementById("imei").textContent = d.imei || "--";
+    document.getElementById("lastUpdate").textContent =
+      `Última atualização: ${fmtTime(d.servertime)} (${new Date().toLocaleDateString("pt-BR")})`;
+
+    const h = Number(d.horas_motor || 0);
+    document.getElementById("horasMotor").textContent = h.toFixed(2) + " h";
+
+    const ligado = !!d.motor_ligado;
+    document.getElementById("motorStatus").textContent = ligado ? "LIGADO" : "DESLIGADO";
+    document.getElementById("motorDot").className = "dot " + (ligado ? "ok" : "");
+    document.getElementById("motorHint").textContent = ligado ? "Ignição ON" : "Ignição OFF";
+
+    const v = Number(d.tensao_bateria || 0);
+    document.getElementById("tensao").textContent = v.toFixed(2) + " V";
+    const cls = tensaoClass(v, ligado);
+    const badge = document.getElementById("tensaoBadge");
+    badge.className = "badge " + cls;
+    badge.textContent = tensaoLabel(v, ligado);
+
+    const restante = 100 - (h % 100);
+    document.getElementById("restanteOleo").textContent = restante.toFixed(2);
+
+    const alerts = [];
+    if (restante < 10) alerts.push(`Troca de óleo em menos de ${restante.toFixed(1)}h.`);
+    if (v < 12.0) alerts.push("Tensão baixa: agendar carga/teste de bateria.");
+    if (ligado && v < 13.2) alerts.push("Motor ligado sem tensão de carga adequada.");
+    setAlertas(alerts);
+
+    if (!isNaN(v) && d.servertime) pushPoint(v, d.servertime);
+  }
+
+  refreshPainel();
+  setInterval(()=>{ if(!viewPainel.classList.contains("hide")) refreshPainel(); }, 10000);
+
+  // ===========================
+  // PREVENTIVA — CRUD SIMPLES
+  // ===========================
+  let planoLocal = [];
+
+  function renderPlano(){
+    const tbody = document.querySelector("#tblPlano tbody");
+    tbody.innerHTML = "";
+    planoLocal.forEach((it, idx)=>{
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${it.nome}</td>
+        <td class="right">${Number(it.primeira_execucao_h).toFixed(1)}</td>
+        <td class="right">${Number(it.intervalo_h).toFixed(1)}</td>
+        <td class="right">${Number(it.avisar_antes_h || 10).toFixed(1)}</td>
+        <td class="right"><button class="btn" data-del="${idx}">Excluir</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll("button[data-del]").forEach(btn=>{
+      btn.onclick = () => {
+        const i = Number(btn.getAttribute("data-del"));
+        planoLocal.splice(i,1);
+        renderPlano();
+      };
+    });
+  }
+
+  async function carregarPlano(){
+    const r = await fetch(ENDPOINT_PLANO, {cache:"no-store"});
+    const d = await r.json();
+    planoLocal = d.plano || [];
+    renderPlano();
+    document.getElementById("planoMsg").textContent = "";
+  }
+
+  document.getElementById("btnAdicionar").onclick = ()=>{
+    const nome = document.getElementById("inpNome").value.trim();
+    const primeira = Number(document.getElementById("inpPrimeira").value);
+    const intervalo = Number(document.getElementById("inpIntervalo").value);
+    const avisar = Number(document.getElementById("inpAvisar").value || 10);
+
+    if(!nome || !primeira || !intervalo){
+      document.getElementById("planoMsg").textContent = "Preencha nome, primeira execução e intervalo.";
+      return;
+    }
+
+    planoLocal.push({
+      nome,
+      primeira_execucao_h: primeira,
+      intervalo_h: intervalo,
+      avisar_antes_h: avisar
+    });
+
+    document.getElementById("inpNome").value = "";
+    document.getElementById("inpPrimeira").value = "";
+    document.getElementById("inpIntervalo").value = "";
+    document.getElementById("inpAvisar").value = "";
+
+    renderPlano();
+    document.getElementById("planoMsg").textContent = "";
+  };
+
+  document.getElementById("btnSalvarPlano").onclick = async ()=>{
+    const r = await fetch(ENDPOINT_PLANO, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({plano: planoLocal})
+    });
+    const d = await r.json();
+    document.getElementById("planoMsg").textContent =
+      d.mensagem ? `✅ ${d.mensagem} (itens: ${d.total_itens})` : `⚠️ ${d.erro || "erro ao salvar"}`;
+  };
+</script>
+</body>
+</html>
