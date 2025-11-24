@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <title>Painel Interno — Preventiva Náutica</title>
+  <title>Painel Interno — Preventiva (Horas/KM)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -78,7 +78,7 @@
     .table th,.table td{border-bottom:1px solid var(--line);padding:8px;text-align:left;}
     .table th{color:var(--muted);font-weight:600}
     .right{text-align:right}
-    input{
+    input, select{
       width:100%; padding:8px; border-radius:8px; border:1px solid var(--line);
       background:#0a1325; color:var(--ink); outline:none;
     }
@@ -94,7 +94,7 @@
     <div class="title">
       <div class="logo">PN</div>
       <div>
-        <h1>Painel Interno — Preventiva Náutica</h1>
+        <h1>Painel Interno — Preventiva (Horas/KM)</h1>
         <div class="sub">BrasilSat → API → Flask → Dashboard (uso interno)</div>
       </div>
     </div>
@@ -102,8 +102,9 @@
     <div class="row">
       <button class="btn active" id="tabPainel">Painel</button>
       <button class="btn" id="tabPreventiva">Preventiva</button>
+      <button class="btn" id="tabAtivos">Ativos</button>
       <div class="pill" id="lastUpdate">Última atualização: --</div>
-      <div class="pill">IMEI: <span id="imei">--</span></div>
+      <div class="pill">Ativo: <span id="ativoNomeTop">--</span></div>
     </div>
   </header>
 
@@ -112,9 +113,9 @@
   ======================== -->
   <section id="viewPainel" class="grid">
     <div class="card col-4">
-      <h2>Horas de Motor (Horímetro)</h2>
-      <div class="kpi" id="horasMotor">-- h</div>
-      <div class="muted">Horas ajustadas (BrasilSat + offset)</div>
+      <h2 id="labelUsoBase">Uso do ativo</h2>
+      <div class="kpi" id="usoBase">--</div>
+      <div class="muted" id="usoHint">Base BrasilSat + offset</div>
     </div>
 
     <div class="card col-4">
@@ -136,9 +137,9 @@
     </div>
 
     <div class="card col-5">
-      <h2>Próxima troca de óleo</h2>
-      <div class="kpi"><span id="restanteOleo">--</span> h</div>
-      <div class="muted">Ciclo padrão: 100h</div>
+      <h2 id="labelProxima">Próxima preventiva</h2>
+      <div class="kpi"><span id="restanteProxima">--</span></div>
+      <div class="muted" id="proximaHint">Base no primeiro item do plano</div>
     </div>
 
     <div class="card col-7">
@@ -172,10 +173,10 @@
   <section id="viewPreventiva" class="grid hide">
     <div class="card col-12">
       <div class="row">
-        <h2 style="margin:0">Plano de Preventiva (por horas)</h2>
+        <h2 style="margin:0" id="tituloPlano">Plano de Preventiva</h2>
         <button class="btn" id="btnSalvarPlano">Salvar plano</button>
       </div>
-      <div class="muted">Cadastre as tarefas conforme o manual do motor.</div>
+      <div class="muted">Cadastre as tarefas conforme o manual do motor/veículo.</div>
     </div>
 
     <div class="card col-12">
@@ -185,15 +186,22 @@
           <input id="inpNome" placeholder="Ex.: Troca de óleo do motor"/>
         </div>
         <div style="flex:1; min-width:140px">
-          <label>Primeira execução (h)</label>
+          <label>Unidade</label>
+          <select id="inpUnidade">
+            <option value="hora">hora (h)</option>
+            <option value="km">km</option>
+          </select>
+        </div>
+        <div style="flex:1; min-width:140px">
+          <label>Primeira execução</label>
           <input id="inpPrimeira" type="number" step="0.1" placeholder="100"/>
         </div>
         <div style="flex:1; min-width:140px">
-          <label>Intervalo (h)</label>
+          <label>Intervalo</label>
           <input id="inpIntervalo" type="number" step="0.1" placeholder="100"/>
         </div>
         <div style="flex:1; min-width:140px">
-          <label>Avisar antes (h)</label>
+          <label>Avisar antes</label>
           <input id="inpAvisar" type="number" step="0.1" placeholder="10"/>
         </div>
         <div>
@@ -208,9 +216,10 @@
         <thead>
           <tr>
             <th>Tarefa</th>
-            <th class="right">1ª Exec (h)</th>
-            <th class="right">Intervalo (h)</th>
-            <th class="right">Avisar (h)</th>
+            <th>Unidade</th>
+            <th class="right">1ª Exec</th>
+            <th class="right">Intervalo</th>
+            <th class="right">Avisar</th>
             <th class="right">Ações</th>
           </tr>
         </thead>
@@ -220,53 +229,139 @@
     </div>
   </section>
 
+  <!-- =======================
+       VIEW ATIVOS (CADASTRO)
+  ======================== -->
+  <section id="viewAtivos" class="grid hide">
+    <div class="card col-12">
+      <div class="row">
+        <h2 style="margin:0">Cadastro de Ativos</h2>
+        <button class="btn" id="btnSalvarAtivo">Salvar ativo</button>
+      </div>
+      <div class="muted">Crie lanchas, caminhões ou qualquer ativo com IMEI.</div>
+    </div>
+
+    <div class="card col-12">
+      <div class="row" style="gap:14px; align-items:flex-end;">
+        <div style="flex:2; min-width:220px">
+          <label>Nome</label>
+          <input id="aNome" placeholder="Ex.: Lancha X / FH 540 ABC-1234"/>
+        </div>
+        <div style="flex:1; min-width:140px">
+          <label>Tipo</label>
+          <select id="aTipo">
+            <option value="lancha">Lancha</option>
+            <option value="caminhao">Caminhão</option>
+          </select>
+        </div>
+        <div style="flex:1; min-width:180px">
+          <label>IMEI</label>
+          <input id="aImei" placeholder="355..."/>
+        </div>
+        <div style="flex:1; min-width:140px">
+          <label>Medida base</label>
+          <select id="aMedida">
+            <option value="hora">hora (h)</option>
+            <option value="km">km</option>
+          </select>
+        </div>
+        <div style="flex:1; min-width:140px">
+          <label>Offset</label>
+          <input id="aOffset" type="number" step="0.1" placeholder="0"/>
+        </div>
+      </div>
+    </div>
+
+    <div class="card col-12">
+      <h2>Ativos cadastrados</h2>
+      <table class="table" id="tblAtivos">
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Tipo</th>
+            <th>IMEI</th>
+            <th>Base</th>
+            <th class="right">Offset</th>
+            <th class="right">Ações</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="muted" id="ativosMsg" style="margin-top:8px"></div>
+    </div>
+  </section>
+
 </div>
 
 <script>
   const ENDPOINT_DADOS = "/dados";
+  const ENDPOINT_PREVENTIVA = "/preventiva";
   const ENDPOINT_PLANO = "/config/plano";
+  const ENDPOINT_ATIVOS = "/ativos";
   const MAX_POINTS = 60;
 
   // ===========================
-  // NAVEGAÇÃO (Painel / Preventiva)
+  // NAVEGAÇÃO
   // ===========================
   const tabPainel = document.getElementById("tabPainel");
   const tabPreventiva = document.getElementById("tabPreventiva");
+  const tabAtivos = document.getElementById("tabAtivos");
   const viewPainel = document.getElementById("viewPainel");
   const viewPreventiva = document.getElementById("viewPreventiva");
+  const viewAtivos = document.getElementById("viewAtivos");
 
   function showPainel(){
     tabPainel.classList.add("active");
     tabPreventiva.classList.remove("active");
+    tabAtivos.classList.remove("active");
     viewPainel.classList.remove("hide");
     viewPreventiva.classList.add("hide");
+    viewAtivos.classList.add("hide");
   }
-  function showPreventiva(){
+
+  async function showPreventiva(){
     tabPreventiva.classList.add("active");
     tabPainel.classList.remove("active");
+    tabAtivos.classList.remove("active");
     viewPreventiva.classList.remove("hide");
     viewPainel.classList.add("hide");
-    carregarPlano();
+    viewAtivos.classList.add("hide");
+    await carregarPlano();
   }
+
+  async function showAtivos(){
+    tabAtivos.classList.add("active");
+    tabPainel.classList.remove("active");
+    tabPreventiva.classList.remove("active");
+    viewAtivos.classList.remove("hide");
+    viewPainel.classList.add("hide");
+    viewPreventiva.classList.add("hide");
+    await carregarAtivos();
+  }
+
   tabPainel.onclick = showPainel;
   tabPreventiva.onclick = showPreventiva;
+  tabAtivos.onclick = showAtivos;
 
   // ===========================
   // HISTÓRICO TENSÃO LOCAL
   // ===========================
-  const storeKey = "preventiva_hist_tensao_v1";
+  const storeKey = "preventiva_hist_tensao_v2";
   let hist = JSON.parse(localStorage.getItem(storeKey) || "[]");
   function saveHist(){ localStorage.setItem(storeKey, JSON.stringify(hist)); }
+
   function fmtTime(ts){
     try{ return new Date(ts*1000).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",second:"2-digit"}); }
     catch(e){ return "--"; }
   }
+
   function tensaoClass(v, motorLigado){
     if (v < 12.0) return "bad";
     if (motorLigado && v < 13.2) return "warn";
     if (!motorLigado && v < 12.3) return "warn";
     return "ok";
   }
+
   function tensaoLabel(v, motorLigado){
     if (v < 12.0) return "Bateria baixa";
     if (motorLigado && v < 13.2) return "Não carregando bem";
@@ -289,6 +384,7 @@
       tbody.appendChild(tr);
     });
   }
+
   function pushPoint(v, servertime){
     hist.push({t:fmtTime(servertime), v, servertime});
     if (hist.length > MAX_POINTS) hist = hist.slice(-MAX_POINTS);
@@ -299,6 +395,7 @@
     document.getElementById("janela").textContent = MAX_POINTS;
     renderLogs();
   }
+
   document.getElementById("clearHistory").onclick = ()=>{
     hist=[]; saveHist();
     chart.data.labels=[]; chart.data.datasets[0].data=[]; chart.update();
@@ -310,16 +407,26 @@
     el.innerHTML = arr.length ? arr.map(a=>`• ${a}`).join("<br>") : "Sem alertas no momento.";
   }
 
+  // ===========================
+  // PAINEL (ativo atual)
+  // ===========================
   async function refreshPainel(){
     const r = await fetch(ENDPOINT_DADOS, {cache:"no-store"});
     const d = await r.json();
+    if (d.erro) {
+      setAlertas([d.erro, "Cadastre um ativo na aba ATIVOS."]);
+      return;
+    }
 
-    document.getElementById("imei").textContent = d.imei || "--";
+    document.getElementById("ativoNomeTop").textContent = d.nome || "--";
     document.getElementById("lastUpdate").textContent =
       `Última atualização: ${fmtTime(d.servertime)} (${new Date().toLocaleDateString("pt-BR")})`;
 
-    const h = Number(d.horas_motor || 0);
-    document.getElementById("horasMotor").textContent = h.toFixed(2) + " h";
+    const uso = Number(d.uso_base || 0);
+    const un = d.unidade_base || "";
+    document.getElementById("labelUsoBase").textContent =
+      d.medida_base === "km" ? "Odômetro (KM)" : "Horímetro (h)";
+    document.getElementById("usoBase").textContent = uso.toFixed(2) + " " + un;
 
     const ligado = !!d.motor_ligado;
     document.getElementById("motorStatus").textContent = ligado ? "LIGADO" : "DESLIGADO";
@@ -333,11 +440,22 @@
     badge.className = "badge " + cls;
     badge.textContent = tensaoLabel(v, ligado);
 
-    const restante = 100 - (h % 100);
-    document.getElementById("restanteOleo").textContent = restante.toFixed(2);
+    // pega próxima preventiva do primeiro item prioritário
+    const pr = await fetch(ENDPOINT_PREVENTIVA, {cache:"no-store"});
+    const pj = await pr.json();
+    const tarefas = pj.tarefas || [];
+    if (tarefas.length){
+      const t0 = tarefas[0];
+      document.getElementById("labelProxima").textContent = t0.nome;
+      document.getElementById("restanteProxima").textContent = t0.faltam.toFixed(2) + " " + pj.unidade;
+    } else {
+      document.getElementById("labelProxima").textContent = "Próxima preventiva";
+      document.getElementById("restanteProxima").textContent = "--";
+    }
 
     const alerts = [];
-    if (restante < 10) alerts.push(`Troca de óleo em menos de ${restante.toFixed(1)}h.`);
+    if (tarefas.find(t=>t.status==="ATENCAO")) alerts.push("Preventiva chegando: verifique aba Preventiva.");
+    if (tarefas.find(t=>t.status==="ATRASADO")) alerts.push("Preventiva atrasada: ação imediata.");
     if (v < 12.0) alerts.push("Tensão baixa: agendar carga/teste de bateria.");
     if (ligado && v < 13.2) alerts.push("Motor ligado sem tensão de carga adequada.");
     setAlertas(alerts);
@@ -352,6 +470,7 @@
   // PREVENTIVA — CRUD SIMPLES
   // ===========================
   let planoLocal = [];
+  let medidaBaseAtual = "hora";
 
   function renderPlano(){
     const tbody = document.querySelector("#tblPlano tbody");
@@ -360,9 +479,10 @@
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${it.nome}</td>
-        <td class="right">${Number(it.primeira_execucao_h).toFixed(1)}</td>
-        <td class="right">${Number(it.intervalo_h).toFixed(1)}</td>
-        <td class="right">${Number(it.avisar_antes_h || 10).toFixed(1)}</td>
+        <td>${it.unidade}</td>
+        <td class="right">${Number(it.primeira_execucao).toFixed(1)}</td>
+        <td class="right">${Number(it.intervalo).toFixed(1)}</td>
+        <td class="right">${Number(it.avisar_antes || 10).toFixed(1)}</td>
         <td class="right"><button class="btn" data-del="${idx}">Excluir</button></td>
       `;
       tbody.appendChild(tr);
@@ -380,13 +500,22 @@
   async function carregarPlano(){
     const r = await fetch(ENDPOINT_PLANO, {cache:"no-store"});
     const d = await r.json();
+    if (d.erro){
+      document.getElementById("planoMsg").textContent = d.erro;
+      return;
+    }
     planoLocal = d.plano || [];
+    medidaBaseAtual = d.medida_base || "hora";
+    document.getElementById("tituloPlano").textContent =
+      medidaBaseAtual === "km" ? "Plano de Preventiva (por KM)" : "Plano de Preventiva (por horas)";
+    document.getElementById("inpUnidade").value = medidaBaseAtual;
     renderPlano();
     document.getElementById("planoMsg").textContent = "";
   }
 
   document.getElementById("btnAdicionar").onclick = ()=>{
     const nome = document.getElementById("inpNome").value.trim();
+    const unidade = document.getElementById("inpUnidade").value;
     const primeira = Number(document.getElementById("inpPrimeira").value);
     const intervalo = Number(document.getElementById("inpIntervalo").value);
     const avisar = Number(document.getElementById("inpAvisar").value || 10);
@@ -396,12 +525,7 @@
       return;
     }
 
-    planoLocal.push({
-      nome,
-      primeira_execucao_h: primeira,
-      intervalo_h: intervalo,
-      avisar_antes_h: avisar
-    });
+    planoLocal.push({ nome, unidade, primeira_execucao: primeira, intervalo, avisar_antes: avisar });
 
     document.getElementById("inpNome").value = "";
     document.getElementById("inpPrimeira").value = "";
@@ -421,6 +545,100 @@
     const d = await r.json();
     document.getElementById("planoMsg").textContent =
       d.mensagem ? `✅ ${d.mensagem} (itens: ${d.total_itens})` : `⚠️ ${d.erro || "erro ao salvar"}`;
+  };
+
+  // ===========================
+  // ATIVOS — CRUD + SELEÇÃO
+  // ===========================
+  let ativosLocal = [];
+  let ativoAtualId = null;
+
+  function renderAtivos(){
+    const tbody = document.querySelector("#tblAtivos tbody");
+    tbody.innerHTML = "";
+
+    ativosLocal.forEach(a=>{
+      const tr = document.createElement("tr");
+      const sel = a.id === ativoAtualId ? " (ATUAL)" : "";
+      tr.innerHTML = `
+        <td>${a.nome}${sel}</td>
+        <td>${a.tipo}</td>
+        <td>${a.imei}</td>
+        <td>${a.medida_base}</td>
+        <td class="right">${Number(a.offset||0).toFixed(1)}</td>
+        <td class="right">
+          <button class="btn" data-sel="${a.id}">Selecionar</button>
+          <button class="btn" data-del="${a.id}">Excluir</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll("button[data-sel]").forEach(btn=>{
+      btn.onclick = async ()=>{
+        const id = btn.getAttribute("data-sel");
+        await fetch(`/ativos/${id}/selecionar`, {method:"POST"});
+        await carregarAtivos();
+        await refreshPainel();
+      };
+    });
+
+    tbody.querySelectorAll("button[data-del]").forEach(btn=>{
+      btn.onclick = async ()=>{
+        const id = btn.getAttribute("data-del");
+        await fetch(`/ativos/${id}`, {method:"DELETE"});
+        await carregarAtivos();
+        await refreshPainel();
+      };
+    });
+  }
+
+  async function carregarAtivos(){
+    const r = await fetch(ENDPOINT_ATIVOS, {cache:"no-store"});
+    const d = await r.json();
+    ativosLocal = d.ativos || [];
+    ativoAtualId = d.ativo_atual_id || null;
+    renderAtivos();
+    document.getElementById("ativosMsg").textContent = ativosLocal.length ? "" : "Nenhum ativo cadastrado ainda.";
+  }
+
+  // auto-ajuste da base conforme tipo
+  document.getElementById("aTipo").onchange = ()=>{
+    const tipo = document.getElementById("aTipo").value;
+    document.getElementById("aMedida").value = (tipo==="caminhao") ? "km" : "hora";
+  };
+
+  document.getElementById("btnSalvarAtivo").onclick = async ()=>{
+    const nome = document.getElementById("aNome").value.trim();
+    const tipo = document.getElementById("aTipo").value;
+    const imei = document.getElementById("aImei").value.trim();
+    const medida_base = document.getElementById("aMedida").value;
+    const offset = Number(document.getElementById("aOffset").value || 0);
+
+    if(!nome || !imei){
+      document.getElementById("ativosMsg").textContent = "Preencha nome e IMEI.";
+      return;
+    }
+
+    const r = await fetch(ENDPOINT_ATIVOS, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({nome, tipo, imei, medida_base, offset})
+    });
+
+    const d = await r.json();
+    if (d.erro){
+      document.getElementById("ativosMsg").textContent = d.erro;
+      return;
+    }
+
+    document.getElementById("aNome").value="";
+    document.getElementById("aImei").value="";
+    document.getElementById("aOffset").value="";
+
+    await carregarAtivos();
+    await refreshPainel();
+    document.getElementById("ativosMsg").textContent = "✅ Ativo salvo.";
   };
 </script>
 </body>
