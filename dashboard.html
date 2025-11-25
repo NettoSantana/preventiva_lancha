@@ -1,9 +1,3 @@
-Veja se é esse:
-
-
-Segue dash:
-
-
 <!doctype html>
 <html lang="pt-BR">
 <head>
@@ -113,6 +107,8 @@ Segue dash:
     <div class="row">
       <button class="btn active" id="tabPainel">Painel</button>
       <button class="btn" id="tabPreventiva">Preventiva</button>
+      <!-- NOVO BOTÃO CLIENTE -->
+      <button class="btn" id="btnCliente">Cliente</button>
       <div class="pill" id="lastUpdate">Última atualização: --</div>
       <div class="pill">IMEI: <span id="imei">--</span></div>
     </div>
@@ -278,6 +274,14 @@ Segue dash:
   }
   tabPainel.onclick = showPainel;
   tabPreventiva.onclick = showPreventiva;
+
+  // 🔹 NOVO: BOTÃO CLIENTE → /cadastro
+  const btnCliente = document.getElementById("btnCliente");
+  if (btnCliente){
+    btnCliente.onclick = () => {
+      window.location.href = "/cadastro";
+    };
+  }
 
   // ===========================
   // HISTÓRICO TENSÃO LOCAL (só para tabela, sem gráfico)

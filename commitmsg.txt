@@ -1,4 +1,4 @@
-﻿feat(ui): adicionar botão Cliente no dashboard
+﻿feat: add Cliente button and cadastro route
 
-- incluir botão 'Cliente' ao lado de Painel/Preventiva
-- redirecionar botão para rota /cadastro
+- create /cadastro route in server.py serving cadastro.html
+- add 'Cliente' button in dashboard header linking to /cadastro
