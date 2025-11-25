@@ -23,12 +23,17 @@
     .wrap{max-width:1200px;margin:28px auto;padding:0 16px}
     header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap}
     .title{display:flex;gap:12px;align-items:center}
+
+    /* LOGO COMO IMAGEM */
     .logo{
-      width:44px;height:44px;border-radius:12px;
-      background:linear-gradient(135deg,#0ea5e9,#22c55e);
-      display:grid;place-items:center;color:#001827;font-weight:900;
+      width:56px;
+      height:56px;
+      border-radius:12px;
+      object-fit:cover;
+      display:block;
       box-shadow:0 10px 30px rgba(56,189,248,.25);
     }
+
     h1{margin:0;font-size:22px;letter-spacing:.3px}
     .sub{color:var(--muted);font-size:13px;margin-top:2px}
     .pill{
@@ -91,7 +96,8 @@
 
   <header>
     <div class="title">
-      <div class="logo">PN</div>
+      <!-- LOGO COMO IMAGEM (coloque logo.jpeg na mesma pasta deste HTML ou ajuste o caminho) -->
+      <img src="logo.jpeg" alt="Preventiva Náutica" class="logo">
       <div>
         <h1>Painel Interno — Preventiva Náutica</h1>
         <div class="sub">BrasilSat → API → Flask → Dashboard (uso interno)</div>
@@ -424,8 +430,9 @@
     refreshPainel();
   };
 
+  // 👉 Atualização AGORA a cada 3 segundos
   refreshPainel();
-  setInterval(()=>{ if(!viewPainel.classList.contains("hide")) refreshPainel(); }, 10000);
+  setInterval(()=>{ if(!viewPainel.classList.contains("hide")) refreshPainel(); }, 3000);
 
   // ===========================
   // PREVENTIVA — CRUD SIMPLES

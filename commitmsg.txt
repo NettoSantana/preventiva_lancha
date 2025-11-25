@@ -1,5 +1,1 @@
-﻿feat: exibir próximas atividades a partir do plano de preventiva no painel
-
-- troca card 'Próxima troca de óleo' por 'Próximas atividades'
-- consome endpoint /preventiva para montar a lista
-- remove cálculo fixo de ciclo de 100h
+﻿feat(dashboard): adicionar card de horas paradas e ajustar hora da embarcação
