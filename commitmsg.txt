@@ -1,1 +1,1 @@
-﻿cadastro.html criado
+﻿feat: atualização do cadastro.html com navegação (Painel / Preventiva / Clientes)
