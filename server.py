@@ -430,10 +430,21 @@ def cadastro():
     return send_from_directory(".", "cadastro.html")
 
 
+# NOVAS ROTAS: painel geral (visão por cliente)
+@app.get("/painel_geral")
+def painel_geral():
+    return send_from_directory(".", "painel_geral.html")
+
+
+@app.get("/painel_geral.html")
+def painel_geral_html():
+    return send_from_directory(".", "painel_geral.html")
+
+
 # ROTA PARA SERVIR A LOGO
 @app.get("/logo.jpeg")
 def logo():
-    # logo.jpeg deve estar no mesmo diretório que server.py e dashboard.html
+    # logo.jpeg deve estar no mesmo diretório que server.py e dashboards
     return send_from_directory(".", "logo.jpeg")
 
 
@@ -921,6 +932,14 @@ def create_cliente():
             "cliente_id": cliente["id"],
         }
     )
+
+
+@app.get("/api/clientes")
+def list_clientes():
+    """
+    Lista simples de clientes para o painel_geral consumir.
+    """
+    return jsonify(clientes_db.get("clientes", []))
 
 
 if __name__ == "__main__":
