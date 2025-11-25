@@ -119,28 +119,13 @@ BOOTSTRAP_MEDIDA = os.getenv("BOOTSTRAP_MEDIDA", "hora")  # hora | km
 
 
 def load_db():
-    """
-    Carrega o db.json e garante a estrutura básica:
-    - ativos: lista de ativos/embarcações
-    - ativo_atual_id: id selecionado
-    - clientes: lista de cadastros de clientes
-    """
     if not os.path.exists(DB_FILE):
-        return {"ativos": [], "ativo_atual_id": None, "clientes": []}
+        return {"ativos": [], "ativo_atual_id": None}
     try:
         with open(DB_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
+            return json.load(f)
     except Exception:
-        return {"ativos": [], "ativo_atual_id": None, "clientes": []}
-
-    if "ativos" not in data or not isinstance(data["ativos"], list):
-        data["ativos"] = []
-    if "ativo_atual_id" not in data:
-        data["ativo_atual_id"] = None
-    if "clientes" not in data or not isinstance(data["clientes"], list):
-        data["clientes"] = []
-
-    return data
+        return {"ativos": [], "ativo_atual_id": None}
 
 
 def save_db(db):
@@ -186,8 +171,6 @@ def bootstrap_db_if_needed():
             ensure_defaults_for_ativo(a)
         if not db.get("ativo_atual_id") and ativos:
             db["ativo_atual_id"] = ativos[0]["id"]
-        # garante também lista de clientes
-        db.setdefault("clientes", [])
         save_db(db)
         return
 
@@ -218,7 +201,6 @@ def bootstrap_db_if_needed():
 
     db["ativos"] = [ativo]
     db["ativo_atual_id"] = ativo["id"]
-    db.setdefault("clientes", [])
     save_db(db)
 
 
@@ -380,73 +362,18 @@ def dashboard():
     return send_from_directory(".", "dashboard.html")
 
 
+# NOVA ROTA: tela de cadastro de cliente
+@app.get("/cadastro")
+def cadastro():
+    # cadastro.html precisa estar na mesma pasta de server.py
+    return send_from_directory(".", "cadastro.html")
+
+
 # ROTA PARA SERVIR A LOGO
 @app.get("/logo.jpeg")
 def logo():
     # logo.jpeg deve estar no mesmo diretório que server.py e dashboard.html
     return send_from_directory(".", "logo.jpeg")
-
-
-# -------- TELA DE CADASTRO (HTML) --------
-@app.get("/cadastro")
-def cadastro_page():
-    """
-    Tela de cadastro (front-end).
-    Espera um arquivo cadastro.html na mesma pasta do server.py.
-    Depois vamos montar esse HTML com o mesmo layout do painel.
-    """
-    return send_from_directory(".", "cadastro.html")
-
-
-# -------- API DE CLIENTES (CADASTRO) --------
-@app.get("/api/clientes")
-def listar_clientes():
-    """
-    Retorna a lista de clientes cadastrados.
-    Uso interno (futuro painel de admin).
-    """
-    return jsonify({"clientes": db.get("clientes", [])})
-
-
-@app.post("/api/clientes")
-def criar_cliente():
-    """
-    Cria um novo cadastro de cliente/embarcação.
-    Espera JSON com campos básicos.
-    """
-    data = request.json or {}
-
-    nome_prop = str(data.get("nome_proprietario", "")).strip()
-    telefone_prop = str(data.get("telefone_proprietario", "")).strip()
-    email_prop = str(data.get("email_proprietario", "")).strip()
-    nome_embarc = str(data.get("nome_embarcacao", "")).strip()
-    marca_motor = str(data.get("marca_motor", "")).strip()
-    modelo_motor = str(data.get("modelo_motor", "")).strip()
-    nome_marinheiro = str(data.get("nome_marinheiro", "")).strip()
-    telefone_marinheiro = str(data.get("telefone_marinheiro", "")).strip()
-    observacoes = str(data.get("observacoes", "")).strip()
-
-    if not nome_prop or not nome_embarc:
-        return jsonify({"erro": "nome_proprietario e nome_embarcacao são obrigatórios"}), 400
-
-    cliente = {
-        "id": uuid.uuid4().hex[:8],
-        "nome_proprietario": nome_prop,
-        "telefone_proprietario": telefone_prop,
-        "email_proprietario": email_prop,
-        "nome_embarcacao": nome_embarc,
-        "marca_motor": marca_motor,
-        "modelo_motor": modelo_motor,
-        "nome_marinheiro": nome_marinheiro,
-        "telefone_marinheiro": telefone_marinheiro,
-        "observacoes": observacoes,
-        "created_at": int(time.time()),
-    }
-
-    db.setdefault("clientes", []).append(cliente)
-    save_db(db)
-
-    return jsonify({"mensagem": "Cliente cadastrado", "cliente": cliente})
 
 
 # -------- ATIVOS (CRUD) --------

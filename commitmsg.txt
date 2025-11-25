@@ -1,4 +1,4 @@
-﻿fix: voltar dashboard para versão com Painel e Preventiva
+﻿feat(ui): adicionar botão Cliente no dashboard
 
-- restaurado layout antigo de cards
-- mantidas abas Painel/Preventiva
+- incluir botão 'Cliente' ao lado de Painel/Preventiva
+- redirecionar botão para rota /cadastro
