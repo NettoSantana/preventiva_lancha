@@ -148,6 +148,13 @@
       </div>
     </div>
 
+    <!-- Horas paradas (não cumulativa, zera ao ligar) -->
+    <div class="card col-4">
+      <h2>Horas paradas</h2>
+      <div class="kpi" id="horasParadas">--</div>
+      <div class="muted">Tempo contínuo com motor desligado (zera ao ligar)</div>
+    </div>
+
     <!-- PRÓXIMAS ATIVIDADES (via /preventiva) -->
     <div class="card col-4">
       <h2>Próximas atividades</h2>
@@ -337,13 +344,11 @@
     // === Hora da embarcação (offset + horas_totais)
     let horaEmbarcacao;
     if (d.medida_base === "hora") {
-      // backend já manda hora_embarcacao pronto; se não vier, calcula
       const rawHora = (d.hora_embarcacao !== undefined && d.hora_embarcacao !== null)
         ? d.hora_embarcacao
         : (Number(d.horas_totais || 0) + Number(d.offset || 0));
       horaEmbarcacao = Number(rawHora || 0);
     } else {
-      // caso de KM: usa uso_base como "odômetro base" pra manter compatível
       horaEmbarcacao = Number(d.uso_base ?? d.km_total ?? 0);
     }
     document.getElementById("horasMotor").textContent = horaEmbarcacao.toFixed(2) + " " + unit;
@@ -372,6 +377,10 @@
     const badge = document.getElementById("tensaoBadge");
     badge.className = "badge " + cls;
     badge.textContent = tensaoLabel(v, ligado);
+
+    // Horas paradas (não cumulativa)
+    const hp = Number(d.horas_paradas ?? 0);
+    document.getElementById("horasParadas").textContent = hp.toFixed(2) + " h";
 
     // PRÓXIMAS ATIVIDADES (a partir da preventiva)
     const elProx = document.getElementById("proxAtividades");
