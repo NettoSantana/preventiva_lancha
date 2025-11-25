@@ -1,5 +1,1 @@
-﻿feat: logo da preventiva e refresh a cada 3s
-
-- Substitui bloco PN pela imagem logo.jpeg no topo
-- Ajusta CSS da classe .logo para usar imagem
-- Atualiza intervalo do refreshPainel de 10s para 3s
+﻿feat: rota para servir logo.jpeg no Flask

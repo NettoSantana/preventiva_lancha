@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Cadastro — Preventiva Náutica</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    :root{
+      --bg:#0b1020; --bg2:#0f172a;
+      --card:#121a2e; --ink:#e5e7eb;
+      --muted:#94a3b8; --accent:#38bdf8;
+      --radius:16px;
+    }
+    *{box-sizing:border-box; font-family:system-ui,Segoe UI,Roboto}
+
+    body{
+      margin:0;
+      background:radial-gradient(1000px 600px at 20% -10%,#12214a 0%,transparent 70%),
+                 radial-gradient(1200px 700px at 110% 20%,#0b3a55 0%,transparent 70%),
+                 var(--bg);
+      color:var(--ink);
+      padding:20px;
+    }
+
+    h1{
+      text-align:center;
+      margin-bottom:30px;
+      font-size:26px;
+      font-weight:600;
+    }
+
+    .card{
+      background:var(--card);
+      padding:20px;
+      border-radius:var(--radius);
+      margin-bottom:25px;
+      box-shadow:0 0 12px rgba(0,0,0,0.3);
+    }
+
+    .card h2{
+      margin-top:0;
+      font-size:20px;
+      color:var(--accent);
+    }
+
+    label{
+      display:block;
+      margin-bottom:6px;
+      font-size:14px;
+      color:var(--muted);
+    }
+
+    input, textarea{
+      width:100%;
+      padding:10px;
+      border:1px solid #334155;
+      margin-bottom:15px;
+      border-radius:8px;
+      background:#0f172a;
+      color:var(--ink);
+      font-size:14px;
+    }
+
+    textarea{
+      height:80px;
+      resize:none;
+    }
+
+    button{
+      width:100%;
+      padding:14px;
+      border:none;
+      border-radius:10px;
+      font-size:16px;
+      font-weight:600;
+      color:#000;
+      background:var(--accent);
+      cursor:pointer;
+      margin-top:10px;
+    }
+
+    .ok{
+      margin-top:15px;
+      padding:12px;
+      background:#0f3f1f;
+      border-left:4px solid #22c55e;
+      display:none;
+    }
+
+    .erro{
+      margin-top:15px;
+      padding:12px;
+      background:#3f0f0f;
+      border-left:4px solid #ef4444;
+      display:none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>Cadastro de Cliente</h1>
+
+  <!-- PROPRIETÁRIO -->
+  <div class="card">
+    <h2>Proprietário</h2>
+
+    <label>Nome do proprietário</label>
+    <input id="nome_proprietario" placeholder="Ex: Marcos Silva">
+
+    <label>Telefone (WhatsApp)</label>
+    <input id="telefone_proprietario" placeholder="(xx) xxxxx-xxxx">
+
+    <label>E-mail</label>
+    <input id="email_proprietario" placeholder="email@exemplo.com">
+  </div>
+
+  <!-- EMBARCAÇÃO -->
+  <div class="card">
+    <h2>Embarcação</h2>
+
+    <label>Nome da embarcação</label>
+    <input id="nome_embarcacao" placeholder="Ex: Poseidon">
+
+    <label>Local / Marina</label>
+    <input id="marina" placeholder="Ex: Marina de Salvador">
+
+    <label>Ano / Observações do casco</label>
+    <input id="obs_embarcacao" placeholder="Opcional">
+  </div>
+
+  <!-- MOTOR -->
+  <div class="card">
+    <h2>Motor</h2>
+
+    <label>Marca</label>
+    <input id="marca_motor" placeholder="Ex: Mercury">
+
+    <label>Modelo</label>
+    <input id="modelo_motor" placeholder="Ex: Verado 300">
+
+    <label>IMEI (rastreador)</label>
+    <input id="imei_motor" placeholder="Número do rastreador">
+  </div>
+
+  <!-- MARINHEIRO -->
+  <div class="card">
+    <h2>Marinheiro / Responsável</h2>
+
+    <label>Nome</label>
+    <input id="nome_marinheiro" placeholder="Se houver">
+
+    <label>Telefone</label>
+    <input id="telefone_marinheiro" placeholder="(xx) xxxxx-xxxx">
+  </div>
+
+  <!-- OBSERVAÇÕES -->
+  <div class="card">
+    <h2>Observações gerais</h2>
+    <textarea id="observacoes" placeholder="Informações adicionais"></textarea>
+  </div>
+
+  <!-- BOTÃO -->
+  <button onclick="salvar()">Salvar Cadastro</button>
+
+  <div class="ok" id="okBox">Cadastro realizado com sucesso!</div>
+  <div class="erro" id="erroBox">Erro ao cadastrar. Verifique os campos.</div>
+
+  <script>
+    async function salvar(){
+      const payload = {
+        nome_proprietario: document.getElementById("nome_proprietario").value,
+        telefone_proprietario: document.getElementById("telefone_proprietario").value,
+        email_proprietario: document.getElementById("email_proprietario").value,
+
+        nome_embarcacao: document.getElementById("nome_embarcacao").value,
+        marina: document.getElementById("marina").value,
+        obs_embarcacao: document.getElementById("obs_embarcacao").value,
+
+        marca_motor: document.getElementById("marca_motor").value,
+        modelo_motor: document.getElementById("modelo_motor").value,
+        imei_motor: document.getElementById("imei_motor").value,
+
+        nome_marinheiro: document.getElementById("nome_marinheiro").value,
+        telefone_marinheiro: document.getElementById("telefone_marinheiro").value,
+
+        observacoes: document.getElementById("observacoes").value
+      };
+
+      try{
+        const r = await fetch("/api/clientes", {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify(payload)
+        });
+
+        const j = await r.json();
+
+        if(r.ok){
+          document.getElementById("okBox").style.display="block";
+          document.getElementById("erroBox").style.display="none";
+        } else {
+          document.getElementById("okBox").style.display="none";
+          document.getElementById("erroBox").style.display="block";
+        }
+      } catch(err){
+        document.getElementById("okBox").style.display="none";
+        document.getElementById("erroBox").style.display="block";
+      }
+    }
+  </script>
+
+</body>
+</html>

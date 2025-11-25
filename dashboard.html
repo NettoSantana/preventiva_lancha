@@ -2,9 +2,8 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <title>Painel Interno — Preventiva Náutica</title>
+  <title>Cadastro de Cliente — Preventiva Náutica</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <!-- REMOVIDO Chart.js, não temos mais gráfico -->
   <style>
     :root{
       --bg:#0b1020; --bg2:#0f172a; --card:#121a2e; --card2:#0f172b;
@@ -23,8 +22,6 @@
     .wrap{max-width:1200px;margin:28px auto;padding:0 16px}
     header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap}
     .title{display:flex;gap:12px;align-items:center}
-
-    /* LOGO COMO IMAGEM */
     .logo{
       width:56px;
       height:56px;
@@ -33,7 +30,6 @@
       display:block;
       box-shadow:0 10px 30px rgba(56,189,248,.25);
     }
-
     h1{margin:0;font-size:22px;letter-spacing:.3px}
     .sub{color:var(--muted);font-size:13px;margin-top:2px}
     .pill{
@@ -44,7 +40,21 @@
       padding:8px 12px;border-radius:10px;border:1px solid var(--line);
       background:#0a1325;color:var(--ink);cursor:pointer;font-size:13px;
     }
-    .btn.active{border-color:rgba(56,189,248,.5); color:var(--accent)}
+    .btn.primary{
+      border-color:rgba(56,189,248,.6);
+      background:linear-gradient(135deg,#0ea5e9,#22c55e);
+      color:#00131c;
+      font-weight:600;
+    }
+    .btn-link{
+      background:transparent;
+      border:none;
+      color:var(--muted);
+      text-decoration:underline;
+      cursor:pointer;
+      font-size:13px;
+      padding:0;
+    }
     .grid{display:grid;gap:14px;grid-template-columns:repeat(12,1fr);}
     .card{
       background:linear-gradient(180deg,var(--card),var(--card2));
@@ -56,38 +66,41 @@
       margin:0 0 8px;font-size:14px;font-weight:700;color:var(--accent);
       letter-spacing:.4px;text-transform:uppercase;
     }
-    .kpi{font-size:30px;font-weight:800;margin:6px 0}
     .muted{color:var(--muted);font-size:13px}
-    .status{display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px}
-    .dot{width:10px;height:10px;border-radius:999px;background:var(--muted);box-shadow:0 0 0 4px rgba(148,163,184,.12);}
-    .dot.ok{background:var(--ok);box-shadow:0 0 0 4px rgba(34,197,94,.12)}
-    .dot.warn{background:var(--warn);box-shadow:0 0 0 4px rgba(245,158,11,.12)}
-    .dot.bad{background:var(--bad);box-shadow:0 0 0 4px rgba(239,68,68,.12)}
-    .badge{
-      display:inline-flex;align-items:center;gap:6px;
-      padding:4px 8px;border-radius:10px;border:1px solid var(--line);
-      font-size:12px;color:var(--muted);
-    }
-    .badge.ok{color:var(--ok);border-color:rgba(34,197,94,.35)}
-    .badge.warn{color:var(--warn);border-color:rgba(245,158,11,.35)}
-    .badge.bad{color:var(--bad);border-color:rgba(239,68,68,.35)}
-    .col-4{grid-column:span 4}
-    .col-5{grid-column:span 5}
-    .col-7{grid-column:span 7}
-    .col-8{grid-column:span 8}
-    .col-12{grid-column:span 12}
-    @media(max-width:900px){.col-4,.col-5,.col-7,.col-8{grid-column:span 12}}
     .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-    .table{width:100%;border-collapse:collapse;margin-top:6px;font-size:13px;}
-    .table th,.table td{border-bottom:1px solid var(--line);padding:8px;text-align:left;}
-    .table th{color:var(--muted);font-weight:600}
-    .right{text-align:right}
-    input{
-      width:100%; padding:8px; border-radius:8px; border:1px solid var(--line);
-      background:#0a1325; color:#e5e7eb; outline:none;
+    .col-4{grid-column:span 4}
+    .col-6{grid-column:span 6}
+    .col-12{grid-column:span 12}
+    @media(max-width:900px){.col-4,.col-6{grid-column:span 12}}
+    label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
+    input, textarea, select{
+      width:100%;
+      padding:8px 10px;
+      border-radius:8px;
+      border:1px solid var(--line);
+      background:#0a1325;
+      color:#e5e7eb;
+      outline:none;
+      font-size:13px;
+      resize:vertical;
     }
-    label{font-size:12px;color:var(--muted)}
-    .hide{display:none !important;}
+    textarea{min-height:80px;}
+    .form-row{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-top:8px;
+    }
+    .form-field{
+      flex:1;
+      min-width:180px;
+    }
+    .msg-area{
+      margin-top:8px;
+      font-size:13px;
+    }
+    .msg-ok{color:#22c55e;}
+    .msg-err{color:#f97316;}
   </style>
 </head>
 
@@ -96,418 +109,159 @@
 
   <header>
     <div class="title">
-      <!-- LOGO COMO IMAGEM (coloque logo.jpeg na mesma pasta deste HTML ou ajuste o caminho) -->
       <img src="logo.jpeg" alt="Preventiva Náutica" class="logo">
       <div>
-        <h1>Painel Interno — Preventiva Náutica</h1>
-        <div class="sub">BrasilSat → API → Flask → Dashboard (uso interno)</div>
+        <h1>Cadastro de Cliente — Preventiva Náutica</h1>
+        <div class="sub">Cadastro interno de proprietário, embarcação, marinheiro e motor</div>
       </div>
     </div>
 
     <div class="row">
-      <button class="btn active" id="tabPainel">Painel</button>
-      <button class="btn" id="tabPreventiva">Preventiva</button>
-      <div class="pill" id="lastUpdate">Última atualização: --</div>
-      <div class="pill">IMEI: <span id="imei">--</span></div>
+      <!-- link simples pra voltar pro painel -->
+      <button class="btn" onclick="window.location.href='/'">Voltar para o painel</button>
     </div>
   </header>
 
-  <!-- =======================
-       PAINEL PRINCIPAL
-  ======================== -->
-  <section id="viewPainel" class="grid">
-    <!-- Hora da embarcação -->
-    <div class="card col-4">
-      <div class="row">
-        <h2>Hora da embarcação</h2>
-        <button class="btn" id="btnAjusteOffset">Ajuste</button>
-      </div>
-      <div class="kpi" id="horasMotor">--</div>
-      <div class="muted">Hora real do motor (offset + horas totais)</div>
-      <div class="muted" style="margin-top:4px">Offset atual: <span id="offsetAtual">0.0</span></div>
-    </div>
-
-    <!-- Horas totais cumulativas -->
-    <div class="card col-4">
-      <h2>Horas totais (cumulativa)</h2>
-      <div class="kpi" id="horasTotais">--</div>
-      <div class="muted">Acumulado desde o início da manutenção</div>
-    </div>
-
-    <!-- Status motor -->
-    <div class="card col-4">
-      <h2>Status do Motor</h2>
-      <div class="kpi" id="motorStatus">--</div>
-      <div class="status">
-        <div class="dot" id="motorDot"></div>
-        <div class="muted" id="motorHint">--</div>
-      </div>
-    </div>
-
-    <!-- Tensão -->
-    <div class="card col-4">
-      <h2>Tensão da Bateria</h2>
-      <div class="kpi" id="tensao">-- V</div>
-      <div class="badge" id="tensaoBadge">--</div>
-      <div class="muted" style="margin-top:6px">
-        &lt;12.0V baixa | 12.0–12.5V ok parado | &gt;13.2V carregando
-      </div>
-    </div>
-
-    <!-- Horas paradas (não cumulativa, zera ao ligar) -->
-    <div class="card col-4">
-      <h2>Horas paradas</h2>
-      <div class="kpi" id="horasParadas">--</div>
-      <div class="muted">Tempo contínuo com motor desligado (zera ao ligar)</div>
-    </div>
-
-    <!-- PRÓXIMAS ATIVIDADES (via /preventiva) -->
-    <div class="card col-4">
-      <h2>Próximas atividades</h2>
-      <div class="muted" id="proxAtividades">Carregando...</div>
-    </div>
-
-    <!-- Alertas -->
-    <div class="card col-4">
-      <h2>Alertas</h2>
-      <div id="alertas" class="muted">--</div>
-    </div>
-
-    <!-- Leituras recentes -->
-    <div class="card col-4">
-      <div class="row">
-        <h2 style="margin:0">Leituras recentes</h2>
-        <button id="clearHistory" class="pill" style="cursor:pointer;border:none">limpar histórico</button>
-      </div>
-      <table class="table" id="logs">
-        <thead><tr><th>Hora</th><th class="right">V</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- =======================
-       VIEW PREVENTIVA (CONFIG)
-  ======================== -->
-  <section id="viewPreventiva" class="grid hide">
+  <section class="grid">
     <div class="card col-12">
       <div class="row">
-        <h2 style="margin:0">Plano de Preventiva (por horas/km)</h2>
-        <button class="btn" id="btnSalvarPlano">Salvar plano</button>
+        <h2 style="margin:0">Dados gerais</h2>
+        <span class="muted">Campos marcados são para uso interno, o cliente não acessa essa tela.</span>
       </div>
-      <div class="muted">Cadastre as tarefas conforme o manual do motor.</div>
-    </div>
+      <form id="formCadastro" style="margin-top:12px">
 
-    <div class="card col-12">
-      <div class="row" style="gap:14px; align-items:flex-end;">
-        <div style="flex:2; min-width:220px">
-          <label>Nome da tarefa</label>
-          <input id="inpNome" placeholder="Ex.: Troca de óleo do motor"/>
+        <!-- PROPRIETÁRIO -->
+        <div class="card" style="margin-bottom:12px">
+          <h2>Proprietário</h2>
+          <div class="form-row">
+            <div class="form-field">
+              <label>Nome do proprietário</label>
+              <input name="nome_proprietario" placeholder="Ex.: João da Silva" required>
+            </div>
+            <div class="form-field">
+              <label>Telefone / WhatsApp</label>
+              <input name="tel_proprietario" placeholder="(71) 9 9999-9999">
+            </div>
+            <div class="form-field">
+              <label>E-mail</label>
+              <input name="email_proprietario" type="email" placeholder="contato@cliente.com">
+            </div>
+          </div>
         </div>
-        <div style="flex:1; min-width:140px">
-          <label>Primeira execução</label>
-          <input id="inpPrimeira" type="number" step="0.1" placeholder="100"/>
-        </div>
-        <div style="flex:1; min-width:140px">
-          <label>Intervalo</label>
-          <input id="inpIntervalo" type="number" step="0.1" placeholder="100"/>
-        </div>
-        <div style="flex:1; min-width:140px">
-          <label>Avisar antes</label>
-          <input id="inpAvisar" type="number" step="0.1" placeholder="10"/>
-        </div>
-        <div>
-          <button class="btn" id="btnAdicionar">Adicionar</button>
-        </div>
-      </div>
-    </div>
 
-    <div class="card col-12">
-      <h2>Itens cadastrados</h2>
-      <table class="table" id="tblPlano">
-        <thead>
-          <tr>
-            <th>Tarefa</th>
-            <th class="right">1ª Exec</th>
-            <th class="right">Intervalo</th>
-            <th class="right">Avisar</th>
-            <th class="right">Ações</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-      <div class="muted" id="planoMsg" style="margin-top:8px"></div>
+        <!-- EMBARCAÇÃO / MOTOR -->
+        <div class="card" style="margin-bottom:12px">
+          <h2>Embarcação &amp; Motor</h2>
+          <div class="form-row">
+            <div class="form-field">
+              <label>Nome da embarcação</label>
+              <input name="nome_embarcacao" placeholder="Ex.: MAR AZUL">
+            </div>
+            <div class="form-field">
+              <label>Tipo de embarcação</label>
+              <input name="tipo_embarcacao" placeholder="Lancha, veleiro, catamarã...">
+            </div>
+            <div class="form-field">
+              <label>Marca do motor</label>
+              <input name="marca_motor" placeholder="Ex.: Mercury">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label>Modelo / Potência do motor</label>
+              <input name="modelo_motor" placeholder="Ex.: 115 HP 4 tempos">
+            </div>
+            <div class="form-field">
+              <label>Nº de série / identificação (opcional)</label>
+              <input name="serie_motor" placeholder="Número de série, se tiver">
+            </div>
+            <div class="form-field">
+              <label>Tipo de controle</label>
+              <input name="tipo_controle" placeholder="Rabeta, popa, centro-rabeta...">
+            </div>
+          </div>
+        </div>
+
+        <!-- MARINHEIRO / OPERAÇÃO -->
+        <div class="card">
+          <h2>Marinheiro &amp; Operação</h2>
+          <div class="form-row">
+            <div class="form-field">
+              <label>Nome do marinheiro principal</label>
+              <input name="nome_marinheiro" placeholder="Quem normalmente pilota a embarcação">
+            </div>
+            <div class="form-field">
+              <label>Contato do marinheiro</label>
+              <input name="tel_marinheiro" placeholder="Telefone / WhatsApp">
+            </div>
+            <div class="form-field">
+              <label>Perfil de uso</label>
+              <select name="perfil_uso">
+                <option value="">Selecione...</option>
+                <option value="fins_de_semana">Fins de semana</option>
+                <option value="frequente">Uso frequente</option>
+                <option value="charter">Charter / aluguel</option>
+                <option value="outro">Outro</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field" style="flex:1 1 100%">
+              <label>Observações gerais</label>
+              <textarea name="observacoes" placeholder="Anote particularidades da embarcação, histórico de manutenção, combinações com o cliente etc."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:14px">
+          <button type="submit" class="btn primary">Salvar cadastro</button>
+          <button type="button" class="btn-link" type="button" onclick="document.getElementById('formCadastro').reset()">Limpar formulário</button>
+        </div>
+
+        <div id="msgCadastro" class="msg-area"></div>
+      </form>
     </div>
   </section>
 
 </div>
 
 <script>
-  const ENDPOINT_DADOS = "/dados";
-  const ENDPOINT_PLANO = "/config/plano";
-  const ENDPOINT_OFFSET = "/config/offset";
-  const ENDPOINT_PREVENTIVA = "/preventiva";
-  const MAX_POINTS = 60;
+  const ENDPOINT_CLIENTES = "/api/clientes";
 
-  // ===========================
-  // NAVEGAÇÃO (Painel / Preventiva)
-  // ===========================
-  const tabPainel = document.getElementById("tabPainel");
-  const tabPreventiva = document.getElementById("tabPreventiva");
-  const viewPainel = document.getElementById("viewPainel");
-  const viewPreventiva = document.getElementById("viewPreventiva");
+  const form = document.getElementById("formCadastro");
+  const msg = document.getElementById("msgCadastro");
 
-  function showPainel(){
-    tabPainel.classList.add("active");
-    tabPreventiva.classList.remove("active");
-    viewPainel.classList.remove("hide");
-    viewPreventiva.classList.add("hide");
-  }
-  function showPreventiva(){
-    tabPreventiva.classList.add("active");
-    tabPainel.classList.remove("active");
-    viewPreventiva.classList.remove("hide");
-    viewPainel.classList.add("hide");
-    carregarPlano();
-  }
-  tabPainel.onclick = showPainel;
-  tabPreventiva.onclick = showPreventiva;
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    msg.textContent = "Salvando...";
+    msg.className = "msg-area";
 
-  // ===========================
-  // HISTÓRICO TENSÃO LOCAL (só para tabela, sem gráfico)
-  // ===========================
-  const storeKey = "preventiva_hist_tensao_v1";
-  let hist = JSON.parse(localStorage.getItem(storeKey) || "[]");
-  function saveHist(){ localStorage.setItem(storeKey, JSON.stringify(hist)); }
-  function fmtTime(ts){
-    try{ return new Date(ts*1000).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",second:"2-digit"}); }
-    catch(e){ return "--"; }
-  }
-  function tensaoClass(v, motorLigado){
-    if (v < 12.0) return "bad";
-    if (motorLigado && v < 13.2) return "warn";
-    if (!motorLigado && v < 12.3) return "warn";
-    return "ok";
-  }
-  function tensaoLabel(v, motorLigado){
-    if (v < 12.0) return "Bateria baixa";
-    if (motorLigado && v < 13.2) return "Não carregando bem";
-    if (!motorLigado && v < 12.3) return "Meia carga";
-    return "Normal";
-  }
+    const data = Object.fromEntries(new FormData(form).entries());
 
-  function renderLogs(){
-    const tbody = document.querySelector("#logs tbody");
-    tbody.innerHTML = "";
-    hist.slice(-10).reverse().forEach(p=>{
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${p.t}</td><td class="right">${p.v.toFixed(2)}</td>`;
-      tbody.appendChild(tr);
-    });
-  }
-
-  function pushPoint(v, servertime){
-    hist.push({t:fmtTime(servertime), v, servertime});
-    if (hist.length > MAX_POINTS) hist = hist.slice(-MAX_POINTS);
-    saveHist();
-    renderLogs();
-  }
-
-  document.getElementById("clearHistory").onclick = ()=>{
-    hist=[]; saveHist();
-    renderLogs();
-  };
-
-  function setAlertas(arr){
-    const el = document.getElementById("alertas");
-    el.innerHTML = arr.length ? arr.map(a=>`• ${a}`).join("<br>") : "Sem alertas no momento.";
-  }
-
-  async function refreshPainel(){
-    // DADOS GERAIS
-    const r = await fetch(ENDPOINT_DADOS, {cache:"no-store"});
-    const d = await r.json();
-
-    // PREVENTIVA (próximas atividades)
-    let tarefas = [];
-    let unidadePreventiva = "";
     try {
-      const rPrev = await fetch(ENDPOINT_PREVENTIVA, {cache:"no-store"});
-      const p = await rPrev.json();
-      tarefas = Array.isArray(p.tarefas) ? p.tarefas : [];
-      unidadePreventiva = p.unidade || "";
-    } catch(e){
-      tarefas = [];
-      unidadePreventiva = "";
-    }
-
-    document.getElementById("imei").textContent = d.imei || "--";
-    document.getElementById("lastUpdate").textContent =
-      `Última atualização: ${fmtTime(d.servertime)} (${new Date().toLocaleDateString("pt-BR")})`;
-
-    const unit = d.unidade_base || (d.medida_base==="km" ? "km" : "h");
-
-    // === Hora da embarcação (offset + horas_totais)
-    let horaEmbarcacao;
-    if (d.medida_base === "hora") {
-      const rawHora = (d.hora_embarcacao !== undefined && d.hora_embarcacao !== null)
-        ? d.hora_embarcacao
-        : (Number(d.horas_totais || 0) + Number(d.offset || 0));
-      horaEmbarcacao = Number(rawHora || 0);
-    } else {
-      horaEmbarcacao = Number(d.uso_base ?? d.km_total ?? 0);
-    }
-    document.getElementById("horasMotor").textContent = horaEmbarcacao.toFixed(2) + " " + unit;
-
-    // Offset atual
-    document.getElementById("offsetAtual").textContent = Number(d.offset || 0).toFixed(2);
-
-    // === Totais cumulativos (sem offset)
-    let total = null;
-    if (d.medida_base === "km") total = d.km_totais;
-    else total = d.horas_totais;
-
-    document.getElementById("horasTotais").textContent =
-      (total !== null && total !== undefined) ? (Number(total).toFixed(2) + " " + unit) : "--";
-
-    // Motor
-    const ligado = !!d.motor_ligado;
-    document.getElementById("motorStatus").textContent = ligado ? "LIGADO" : "DESLIGADO";
-    document.getElementById("motorDot").className = "dot " + (ligado ? "ok" : "");
-    document.getElementById("motorHint").textContent = ligado ? "Ignição ON" : "Ignição OFF";
-
-    // Tensão
-    const v = Number(d.tensao_bateria || 0);
-    document.getElementById("tensao").textContent = v.toFixed(2) + " V";
-    const cls = tensaoClass(v, ligado);
-    const badge = document.getElementById("tensaoBadge");
-    badge.className = "badge " + cls;
-    badge.textContent = tensaoLabel(v, ligado);
-
-    // Horas paradas (não cumulativa)
-    const hp = Number(d.horas_paradas ?? 0);
-    document.getElementById("horasParadas").textContent = hp.toFixed(2) + " h";
-
-    // PRÓXIMAS ATIVIDADES (a partir da preventiva)
-    const elProx = document.getElementById("proxAtividades");
-    if (!tarefas.length) {
-      elProx.textContent = "Nenhuma atividade pendente cadastrada.";
-    } else {
-      const linhas = tarefas.slice(0, 3).map(t => {
-        const faltam = (typeof t.faltam === "number") ? t.faltam.toFixed(1) : t.faltam;
-        const status = t.status || "";
-        const unidade = unidadePreventiva || t.unidade || unit || "";
-        return `• ${t.nome} em ${faltam} ${unidade} (${status})`;
+      const r = await fetch(ENDPOINT_CLIENTES, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
       });
-      elProx.innerHTML = linhas.join("<br>");
+      const resp = await r.json().catch(() => ({}));
+
+      if (!r.ok || resp.erro) {
+        msg.textContent = resp.erro || "Erro ao salvar cadastro.";
+        msg.className = "msg-area msg-err";
+        return;
+      }
+
+      msg.textContent = resp.mensagem || "Cadastro salvo com sucesso.";
+      msg.className = "msg-area msg-ok";
+      // se quiser limpar depois de salvar:
+      // form.reset();
+    } catch (e) {
+      console.error(e);
+      msg.textContent = "Falha de comunicação com o servidor.";
+      msg.className = "msg-area msg-err";
     }
-
-    // ALERTAS (bateria / carga)
-    const alerts = [];
-    if (v < 12.0) alerts.push("Tensão baixa: agendar carga/teste de bateria.");
-    if (ligado && v < 13.2) alerts.push("Motor ligado sem tensão de carga adequada.");
-    setAlertas(alerts);
-
-    // histórico de leituras (tabela)
-    if (!isNaN(v) && d.servertime) pushPoint(v, d.servertime);
-  }
-
-  // Botão AJUSTE (offset)
-  document.getElementById("btnAjusteOffset").onclick = async ()=>{
-    const atual = document.getElementById("offsetAtual").textContent || "0";
-    const novo = prompt("Digite o novo offset (h ou km):", atual);
-    if (novo === null) return;
-    const val = Number(novo);
-    if (isNaN(val)) { alert("offset inválido"); return; }
-
-    const r = await fetch(ENDPOINT_OFFSET, {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({offset: val})
-    });
-    const d = await r.json();
-    if (d.erro) alert(d.erro);
-    refreshPainel();
-  };
-
-  // 👉 Atualização AGORA a cada 3 segundos
-  refreshPainel();
-  setInterval(()=>{ if(!viewPainel.classList.contains("hide")) refreshPainel(); }, 3000);
-
-  // ===========================
-  // PREVENTIVA — CRUD SIMPLES
-  // ===========================
-  let planoLocal = [];
-
-  function renderPlano(){
-    const tbody = document.querySelector("#tblPlano tbody");
-    tbody.innerHTML = "";
-    planoLocal.forEach((it, idx)=>{
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${it.nome}</td>
-        <td class="right">${Number(it.primeira_execucao).toFixed(1)}</td>
-        <td class="right">${Number(it.intervalo).toFixed(1)}</td>
-        <td class="right">${Number(it.avisar_antes || 10).toFixed(1)}</td>
-        <td class="right"><button class="btn" data-del="${idx}">Excluir</button></td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    tbody.querySelectorAll("button[data-del]").forEach(btn=>{
-      btn.onclick = () => {
-        const i = Number(btn.getAttribute("data-del"));
-        planoLocal.splice(i,1);
-        renderPlano();
-      };
-    });
-  }
-
-  async function carregarPlano(){
-    const r = await fetch(ENDPOINT_PLANO, {cache:"no-store"});
-    const d = await r.json();
-    planoLocal = d.plano || [];
-    renderPlano();
-    document.getElementById("planoMsg").textContent = "";
-  }
-
-  document.getElementById("btnAdicionar").onclick = ()=>{
-    const nome = document.getElementById("inpNome").value.trim();
-    const primeira = Number(document.getElementById("inpPrimeira").value);
-    const intervalo = Number(document.getElementById("inpIntervalo").value);
-    const avisar = Number(document.getElementById("inpAvisar").value || 10);
-
-    if(!nome || !primeira || !intervalo){
-      document.getElementById("planoMsg").textContent = "Preencha nome, primeira execução e intervalo.";
-      return;
-    }
-
-    planoLocal.push({
-      nome,
-      primeira_execucao: primeira,
-      intervalo: intervalo,
-      avisar_antes: avisar
-    });
-
-    document.getElementById("inpNome").value = "";
-    document.getElementById("inpPrimeira").value = "";
-    document.getElementById("inpIntervalo").value = "";
-    document.getElementById("inpAvisar").value = "";
-
-    renderPlano();
-    document.getElementById("planoMsg").textContent = "";
-  };
-
-  document.getElementById("btnSalvarPlano").onclick = async ()=>{
-    const r = await fetch(ENDPOINT_PLANO, {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({plano: planoLocal})
-    });
-    const d = await r.json();
-    document.getElementById("planoMsg").textContent =
-      d.mensagem ? `✅ ${d.mensagem} (itens: ${d.total_itens})` : `⚠️ ${d.erro || "erro ao salvar"}`;
-  };
+  });
 </script>
 </body>
 </html>
