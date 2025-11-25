@@ -420,10 +420,6 @@ def atualizar_horas_totais(ativo, servertime: int, motor_ligado: bool):
 # =========================
 @app.get("/")
 def dashboard():
-@app.get('/painel_geral')
-def painel_geral():
-    return send_from_directory('.', 'painel_geral.html')
-
     return send_from_directory(".", "dashboard.html")
 
 
@@ -435,6 +431,7 @@ def cadastro():
 
 
 # NOVA ROTA: painel geral (visão por cliente)
+@app.get("/painel_geral")
 @app.get("/painel_geral.html")
 def painel_geral():
     return send_from_directory(".", "painel_geral.html")
@@ -931,6 +928,16 @@ def create_cliente():
             "cliente_id": cliente["id"],
         }
     )
+
+
+# NOVA ROTA: listar clientes (para o painel_geral)
+@app.get("/api/clientes")
+def list_clientes():
+    """
+    Retorna todos os clientes em formato JSON.
+    Compatível com o painel_geral.html que espera { clientes: [...] }.
+    """
+    return jsonify({"clientes": clientes_db.get("clientes", [])})
 
 
 if __name__ == "__main__":

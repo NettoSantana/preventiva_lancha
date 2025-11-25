@@ -1,1 +1,1 @@
-﻿feat: rota painel geral e navegacao entre paineis
+﻿commit: adiciona rota /painel_geral ao server.py
