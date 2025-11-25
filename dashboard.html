@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <title>Painel Interno — Preventiva Náutica</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- REMOVIDO Chart.js, não temos mais gráfico -->
   <style>
     :root{
       --bg:#0b1020; --bg2:#0f172a; --card:#121a2e; --card2:#0f172b;
@@ -149,7 +149,7 @@
       </div>
     </div>
 
-    <!-- Próxima troca -->
+    <!-- Próxima troca (vai virar “próximas atividades” depois) -->
     <div class="card col-4">
       <h2>Próxima troca de óleo</h2>
       <div class="kpi"><span id="restanteOleo">--</span> h</div>
@@ -162,15 +162,9 @@
       <div id="alertas" class="muted">--</div>
     </div>
 
-    <!-- Gráfico + logs (mantidos como estavam) -->
-    <div class="card col-8">
-      <div class="row">
-        <h2 style="margin:0">Tensão (histórico interno)</h2>
-        <div class="pill">Janela: <span id="janela">60</span> leituras</div>
-      </div>
-      <canvas id="chartTensao" height="140"></canvas>
-    </div>
+    <!-- REMOVIDO: card do gráfico de tensão -->
 
+    <!-- Leituras recentes (mantido) -->
     <div class="card col-4">
       <div class="row">
         <h2 style="margin:0">Leituras recentes</h2>
@@ -270,7 +264,7 @@
   tabPreventiva.onclick = showPreventiva;
 
   // ===========================
-  // HISTÓRICO TENSÃO LOCAL
+  // HISTÓRICO TENSÃO LOCAL (só para tabela, sem gráfico)
   // ===========================
   const storeKey = "preventiva_hist_tensao_v1";
   let hist = JSON.parse(localStorage.getItem(storeKey) || "[]");
@@ -292,12 +286,6 @@
     return "Normal";
   }
 
-  const chart = new Chart(document.getElementById("chartTensao"), {
-    type:"line",
-    data:{ labels: hist.map(p=>p.t), datasets:[{label:"Tensão (V)", data: hist.map(p=>p.v), tension:.25, pointRadius:2}]},
-    options:{ responsive:true, animation:false, scales:{y:{suggestedMin:10.5,suggestedMax:14.8}}, plugins:{legend:{labels:{color:"#94a3b8"}}}}
-  });
-
   function renderLogs(){
     const tbody = document.querySelector("#logs tbody");
     tbody.innerHTML = "";
@@ -307,19 +295,16 @@
       tbody.appendChild(tr);
     });
   }
+
   function pushPoint(v, servertime){
     hist.push({t:fmtTime(servertime), v, servertime});
     if (hist.length > MAX_POINTS) hist = hist.slice(-MAX_POINTS);
     saveHist();
-    chart.data.labels = hist.map(p=>p.t);
-    chart.data.datasets[0].data = hist.map(p=>p.v);
-    chart.update();
-    document.getElementById("janela").textContent = MAX_POINTS;
     renderLogs();
   }
+
   document.getElementById("clearHistory").onclick = ()=>{
     hist=[]; saveHist();
-    chart.data.labels=[]; chart.data.datasets[0].data=[]; chart.update();
     renderLogs();
   };
 
@@ -366,7 +351,7 @@
     badge.className = "badge " + cls;
     badge.textContent = tensaoLabel(v, ligado);
 
-    // Próxima troca de óleo (por horas)
+    // Próxima troca de óleo (temporário, depois vamos ligar ao plano de preventiva)
     const h = Number(d.horas_motor || 0);
     const restante = 100 - (h % 100);
     document.getElementById("restanteOleo").textContent = restante.toFixed(2);
@@ -377,6 +362,7 @@
     if (ligado && v < 13.2) alerts.push("Motor ligado sem tensão de carga adequada.");
     setAlertas(alerts);
 
+    // registra no histórico de leituras (para a tabela)
     if (!isNaN(v) && d.servertime) pushPoint(v, d.servertime);
   }
 

@@ -1,1 +1,6 @@
-﻿fix: atualização do servidor (versão corrigida do /dados)
+﻿feat: horímetro cumulativo interno e ajuste de horas_totais
+
+- cria horas_totais e horimetro_state no db.json
+- usa servertime + motor_ligado para acumular horas
+- evita zerar quando acctime da BrasilSat volta a 0
+- /config/horas_totais vira botão de ajuste do horímetro
