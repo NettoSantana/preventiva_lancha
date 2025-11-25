@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <title>Painel Interno — Preventiva Náutica</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root{
       --bg:#0b1020; --bg2:#0f172a; --card:#121a2e; --card2:#0f172b;
@@ -22,15 +23,11 @@
     .wrap{max-width:1200px;margin:28px auto;padding:0 16px}
     header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap}
     .title{display:flex;gap:12px;align-items:center}
-    .logo-box{
-      width:52px;height:52px;border-radius:12px;
-      background:#0a1325;border:1px solid var(--line);
-      display:grid;place-items:center;overflow:hidden;
-      box-shadow:0 10px 30px rgba(0,0,0,.35);
-    }
-    .logo-box img{width:100%;height:100%;object-fit:contain;display:block}
-    .logo-fallback{
-      font-weight:900;color:var(--accent);letter-spacing:.5px;
+    .logo{
+      width:44px;height:44px;border-radius:12px;
+      background:linear-gradient(135deg,#0ea5e9,#22c55e);
+      display:grid;place-items:center;color:#001827;font-weight:900;
+      box-shadow:0 10px 30px rgba(56,189,248,.25);
     }
     h1{margin:0;font-size:22px;letter-spacing:.3px}
     .sub{color:var(--muted);font-size:13px;margin-top:2px}
@@ -71,11 +68,11 @@
     .badge.bad{color:var(--bad);border-color:rgba(239,68,68,.35)}
     .col-4{grid-column:span 4}
     .col-5{grid-column:span 5}
-    .col-6{grid-column:span 6}
     .col-7{grid-column:span 7}
     .col-8{grid-column:span 8}
     .col-12{grid-column:span 12}
-    @media(max-width:900px){.col-4,.col-5,.col-6,.col-7,.col-8{grid-column:span 12}}
+    @media(max-width:900px){.col-4,.col-5,.col-7,.col-8{grid-column:span 12}}
+    canvas{width:100% !important;}
     .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
     .table{width:100%;border-collapse:collapse;margin-top:6px;font-size:13px;}
     .table th,.table td{border-bottom:1px solid var(--line);padding:8px;text-align:left;}
@@ -95,10 +92,7 @@
 
   <header>
     <div class="title">
-      <div class="logo-box">
-        <img src="/static/logo.png" alt="Preventiva Náutica" onerror="this.remove(); document.getElementById('logoFallback').classList.remove('hide')">
-        <div id="logoFallback" class="logo-fallback hide">PN</div>
-      </div>
+      <div class="logo">PN</div>
       <div>
         <h1>Painel Interno — Preventiva Náutica</h1>
         <div class="sub">BrasilSat → API → Flask → Dashboard (uso interno)</div>
@@ -108,10 +102,8 @@
     <div class="row">
       <button class="btn active" id="tabPainel">Painel</button>
       <button class="btn" id="tabPreventiva">Preventiva</button>
-
       <div class="pill" id="lastUpdate">Última atualização: --</div>
       <div class="pill">IMEI: <span id="imei">--</span></div>
-      <div class="pill">Ativo: <span id="nomeAtivo">--</span></div>
     </div>
   </header>
 
@@ -119,26 +111,26 @@
        PAINEL PRINCIPAL
   ======================== -->
   <section id="viewPainel" class="grid">
-
+    <!-- Hora da embarcação -->
     <div class="card col-4">
-      <h2>Uso Base</h2>
-      <div class="kpi" id="usoBase">--</div>
-      <div class="muted">Horímetro/KM ajustado (BrasilSat + offset)</div>
+      <div class="row">
+        <h2>Hora da embarcação</h2>
+        <button class="btn" id="btnAjusteOffset">Ajuste</button>
+      </div>
+      <div class="kpi" id="horasMotor">--</div>
+      <div class="muted">Leitura base (BrasilSat + offset)</div>
+      <div class="muted" style="margin-top:4px">Offset atual: <span id="offsetAtual">0.0</span></div>
     </div>
 
+    <!-- Horas totais cumulativas -->
     <div class="card col-4">
-      <h2>Horas Totais (cumulativa)</h2>
-      <div class="kpi" id="totalCumulativo">--</div>
-      <div class="muted">Base manual + BrasilSat ajustado</div>
+      <h2>Horas totais (cumulativa)</h2>
+      <div class="kpi" id="horasTotais">--</div>
+      <div class="muted">BrasilSat + base manual (não zera)</div>
     </div>
 
+    <!-- Status motor -->
     <div class="card col-4">
-      <h2>Horas Paradas (zera ao ligar)</h2>
-      <div class="kpi" id="horasParadas">--</div>
-      <div class="muted">Tempo parado desde o último “motor ligado”</div>
-    </div>
-
-    <div class="card col-6">
       <h2>Status do Motor</h2>
       <div class="kpi" id="motorStatus">--</div>
       <div class="status">
@@ -147,7 +139,8 @@
       </div>
     </div>
 
-    <div class="card col-6">
+    <!-- Tensão -->
+    <div class="card col-4">
       <h2>Tensão da Bateria</h2>
       <div class="kpi" id="tensao">-- V</div>
       <div class="badge" id="tensaoBadge">--</div>
@@ -156,17 +149,38 @@
       </div>
     </div>
 
-    <div class="card col-5">
+    <!-- Próxima troca -->
+    <div class="card col-4">
       <h2>Próxima troca de óleo</h2>
-      <div class="kpi"><span id="restanteOleo">--</span> <span id="unitOleo">h</span></div>
-      <div class="muted">Ciclo padrão: 100h (ou 10.000 km)</div>
+      <div class="kpi"><span id="restanteOleo">--</span> h</div>
+      <div class="muted">Ciclo padrão: 100h</div>
     </div>
 
-    <div class="card col-7">
+    <!-- Alertas -->
+    <div class="card col-4">
       <h2>Alertas</h2>
       <div id="alertas" class="muted">--</div>
     </div>
 
+    <!-- Gráfico + logs (mantidos como estavam) -->
+    <div class="card col-8">
+      <div class="row">
+        <h2 style="margin:0">Tensão (histórico interno)</h2>
+        <div class="pill">Janela: <span id="janela">60</span> leituras</div>
+      </div>
+      <canvas id="chartTensao" height="140"></canvas>
+    </div>
+
+    <div class="card col-4">
+      <div class="row">
+        <h2 style="margin:0">Leituras recentes</h2>
+        <button id="clearHistory" class="pill" style="cursor:pointer;border:none">limpar histórico</button>
+      </div>
+      <table class="table" id="logs">
+        <thead><tr><th>Hora</th><th class="right">V</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </section>
 
   <!-- =======================
@@ -175,10 +189,10 @@
   <section id="viewPreventiva" class="grid hide">
     <div class="card col-12">
       <div class="row">
-        <h2 style="margin:0">Plano de Preventiva (por horas ou km)</h2>
+        <h2 style="margin:0">Plano de Preventiva (por horas/km)</h2>
         <button class="btn" id="btnSalvarPlano">Salvar plano</button>
       </div>
-      <div class="muted">Cadastre as tarefas conforme manual do motor.</div>
+      <div class="muted">Cadastre as tarefas conforme o manual do motor.</div>
     </div>
 
     <div class="card col-12">
@@ -228,8 +242,12 @@
 <script>
   const ENDPOINT_DADOS = "/dados";
   const ENDPOINT_PLANO = "/config/plano";
+  const ENDPOINT_OFFSET = "/config/offset";
+  const MAX_POINTS = 60;
 
+  // ===========================
   // NAVEGAÇÃO (Painel / Preventiva)
+  // ===========================
   const tabPainel = document.getElementById("tabPainel");
   const tabPreventiva = document.getElementById("tabPreventiva");
   const viewPainel = document.getElementById("viewPainel");
@@ -251,6 +269,12 @@
   tabPainel.onclick = showPainel;
   tabPreventiva.onclick = showPreventiva;
 
+  // ===========================
+  // HISTÓRICO TENSÃO LOCAL
+  // ===========================
+  const storeKey = "preventiva_hist_tensao_v1";
+  let hist = JSON.parse(localStorage.getItem(storeKey) || "[]");
+  function saveHist(){ localStorage.setItem(storeKey, JSON.stringify(hist)); }
   function fmtTime(ts){
     try{ return new Date(ts*1000).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",second:"2-digit"}); }
     catch(e){ return "--"; }
@@ -268,6 +292,37 @@
     return "Normal";
   }
 
+  const chart = new Chart(document.getElementById("chartTensao"), {
+    type:"line",
+    data:{ labels: hist.map(p=>p.t), datasets:[{label:"Tensão (V)", data: hist.map(p=>p.v), tension:.25, pointRadius:2}]},
+    options:{ responsive:true, animation:false, scales:{y:{suggestedMin:10.5,suggestedMax:14.8}}, plugins:{legend:{labels:{color:"#94a3b8"}}}}
+  });
+
+  function renderLogs(){
+    const tbody = document.querySelector("#logs tbody");
+    tbody.innerHTML = "";
+    hist.slice(-10).reverse().forEach(p=>{
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${p.t}</td><td class="right">${p.v.toFixed(2)}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+  function pushPoint(v, servertime){
+    hist.push({t:fmtTime(servertime), v, servertime});
+    if (hist.length > MAX_POINTS) hist = hist.slice(-MAX_POINTS);
+    saveHist();
+    chart.data.labels = hist.map(p=>p.t);
+    chart.data.datasets[0].data = hist.map(p=>p.v);
+    chart.update();
+    document.getElementById("janela").textContent = MAX_POINTS;
+    renderLogs();
+  }
+  document.getElementById("clearHistory").onclick = ()=>{
+    hist=[]; saveHist();
+    chart.data.labels=[]; chart.data.datasets[0].data=[]; chart.update();
+    renderLogs();
+  };
+
   function setAlertas(arr){
     const el = document.getElementById("alertas");
     el.innerHTML = arr.length ? arr.map(a=>`• ${a}`).join("<br>") : "Sem alertas no momento.";
@@ -278,16 +333,32 @@
     const d = await r.json();
 
     document.getElementById("imei").textContent = d.imei || "--";
-    document.getElementById("nomeAtivo").textContent = d.nome || "--";
-
     document.getElementById("lastUpdate").textContent =
       `Última atualização: ${fmtTime(d.servertime)} (${new Date().toLocaleDateString("pt-BR")})`;
 
+    // === Hora da embarcação (uso_base)
+    const uso = Number(d.uso_base ?? d.horas_motor ?? 0);
+    const unit = d.unidade_base || (d.medida_base==="km" ? "km" : "h");
+    document.getElementById("horasMotor").textContent = uso.toFixed(2) + " " + unit;
+
+    // Offset atual
+    document.getElementById("offsetAtual").textContent = Number(d.offset || 0).toFixed(2);
+
+    // === Totais cumulativos
+    let total = null;
+    if (d.medida_base === "km") total = d.km_totais;
+    else total = d.horas_totais;
+
+    document.getElementById("horasTotais").textContent =
+      (total !== null && total !== undefined) ? (Number(total).toFixed(2) + " " + unit) : "--";
+
+    // Motor
     const ligado = !!d.motor_ligado;
     document.getElementById("motorStatus").textContent = ligado ? "LIGADO" : "DESLIGADO";
     document.getElementById("motorDot").className = "dot " + (ligado ? "ok" : "");
     document.getElementById("motorHint").textContent = ligado ? "Ignição ON" : "Ignição OFF";
 
+    // Tensão
     const v = Number(d.tensao_bateria || 0);
     document.getElementById("tensao").textContent = v.toFixed(2) + " V";
     const cls = tensaoClass(v, ligado);
@@ -295,47 +366,40 @@
     badge.className = "badge " + cls;
     badge.textContent = tensaoLabel(v, ligado);
 
-    const usoBase = Number(d.uso_base || 0);
-    const unidadeBase = d.unidade_base || (d.medida_base === "km" ? "km" : "h");
-    document.getElementById("usoBase").textContent = usoBase.toFixed(2) + " " + unidadeBase;
-
-    // Totais cumulativos dependendo da medida
-    if (d.medida_base === "km"){
-      const kmTotais = Number(d.km_totais || 0);
-      document.getElementById("totalCumulativo").textContent = kmTotais.toFixed(2) + " km";
-      document.getElementById("unitOleo").textContent = "km";
-      const restante = 10000 - (usoBase % 10000);
-      document.getElementById("restanteOleo").textContent = restante.toFixed(0);
-    } else {
-      const horasTotais = Number(d.horas_totais || 0);
-      document.getElementById("totalCumulativo").textContent = horasTotais.toFixed(2) + " h";
-      document.getElementById("unitOleo").textContent = "h";
-      const restante = 100 - (usoBase % 100);
-      document.getElementById("restanteOleo").textContent = restante.toFixed(2);
-    }
-
-    const paradas = Number(d.horas_paradas || 0);
-    document.getElementById("horasParadas").textContent = paradas.toFixed(2) + " h";
+    // Próxima troca de óleo (por horas)
+    const h = Number(d.horas_motor || 0);
+    const restante = 100 - (h % 100);
+    document.getElementById("restanteOleo").textContent = restante.toFixed(2);
 
     const alerts = [];
-    const restanteOleoNum = Number(document.getElementById("restanteOleo").textContent || 0);
-    if (d.medida_base === "km"){
-      if (restanteOleoNum < 500) alerts.push(`Troca de óleo em menos de ${restanteOleoNum} km.`);
-    } else {
-      if (restanteOleoNum < 10) alerts.push(`Troca de óleo em menos de ${restanteOleoNum.toFixed(1)}h.`);
-    }
-
+    if (restante < 10) alerts.push(`Troca de óleo em menos de ${restante.toFixed(1)}h.`);
     if (v < 12.0) alerts.push("Tensão baixa: agendar carga/teste de bateria.");
     if (ligado && v < 13.2) alerts.push("Motor ligado sem tensão de carga adequada.");
     setAlertas(alerts);
+
+    if (!isNaN(v) && d.servertime) pushPoint(v, d.servertime);
   }
 
-  refreshPainel();
+  // Botão AJUSTE (offset)
+  document.getElementById("btnAjusteOffset").onclick = async ()=>{
+    const atual = document.getElementById("offsetAtual").textContent || "0";
+    const novo = prompt("Digite o novo offset (h ou km):", atual);
+    if (novo === null) return;
+    const val = Number(novo);
+    if (isNaN(val)) { alert("offset inválido"); return; }
 
-  // Atualiza a cada 10 segundos quando estiver na aba Painel
-  setInterval(()=>{
-    if(!viewPainel.classList.contains("hide")) refreshPainel();
-  }, 10000);
+    const r = await fetch(ENDPOINT_OFFSET, {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({offset: val})
+    });
+    const d = await r.json();
+    if (d.erro) alert(d.erro);
+    refreshPainel();
+  };
+
+  refreshPainel();
+  setInterval(()=>{ if(!viewPainel.classList.contains("hide")) refreshPainel(); }, 10000);
 
   // ===========================
   // PREVENTIVA — CRUD SIMPLES
@@ -387,9 +451,8 @@
 
     planoLocal.push({
       nome,
-      unidade: "hora", // o server ajusta pelo ativo atual
       primeira_execucao: primeira,
-      intervalo,
+      intervalo: intervalo,
       avisar_antes: avisar
     });
 
