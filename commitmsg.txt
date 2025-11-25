@@ -1,1 +1,1 @@
-﻿feat: rota para servir logo.jpeg no Flask
+﻿cadastro.html criado

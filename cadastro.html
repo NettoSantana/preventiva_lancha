@@ -11,25 +11,82 @@
       --card:#121a2e; --ink:#e5e7eb;
       --muted:#94a3b8; --accent:#38bdf8;
       --radius:16px;
+      --line:#1f2a44;
     }
-    *{box-sizing:border-box; font-family:system-ui,Segoe UI,Roboto}
+    *{
+      box-sizing:border-box;
+      font-family:system-ui,Segoe UI,Roboto,Arial;
+    }
 
     body{
       margin:0;
-      background:radial-gradient(1000px 600px at 20% -10%,#12214a 0%,transparent 70%),
-                 radial-gradient(1200px 700px at 110% 20%,#0b3a55 0%,transparent 70%),
-                 var(--bg);
+      background:
+        radial-gradient(1000px 600px at 20% -10%,#12214a 0%,transparent 70%),
+        radial-gradient(1200px 700px at 110% 20%,#0b3a55 0%,transparent 70%),
+        linear-gradient(180deg,var(--bg),var(--bg2));
       color:var(--ink);
-      padding:20px;
     }
 
+    .wrap{
+      max-width:1200px;
+      margin:28px auto;
+      padding:0 16px 24px;
+    }
+
+    /* HEADER / NAV IGUAL AO PAINEL */
+    header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:16px;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+    .title{
+      display:flex;
+      gap:12px;
+      align-items:center;
+    }
+    .logo{
+      width:56px;
+      height:56px;
+      border-radius:12px;
+      object-fit:cover;
+      display:block;
+      box-shadow:0 10px 30px rgba(56,189,248,.25);
+    }
     h1{
-      text-align:center;
-      margin-bottom:30px;
-      font-size:26px;
-      font-weight:600;
+      margin:0;
+      font-size:22px;
+      letter-spacing:.3px;
+    }
+    .sub{
+      color:var(--muted);
+      font-size:13px;
+      margin-top:2px;
+    }
+    .row{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .btn{
+      padding:8px 12px;
+      border-radius:10px;
+      border:1px solid var(--line);
+      background:#0a1325;
+      color:var(--ink);
+      cursor:pointer;
+      font-size:13px;
+    }
+    .btn.active{
+      border-color:rgba(56,189,248,.5);
+      color:var(--accent);
     }
 
+    /* CARDS / FORM */
     .card{
       background:var(--card);
       padding:20px;
@@ -67,7 +124,7 @@
       resize:none;
     }
 
-    button{
+    .btn-primary{
       width:100%;
       padding:14px;
       border:none;
@@ -86,6 +143,7 @@
       background:#0f3f1f;
       border-left:4px solid #22c55e;
       display:none;
+      font-size:14px;
     }
 
     .erro{
@@ -94,13 +152,30 @@
       background:#3f0f0f;
       border-left:4px solid #ef4444;
       display:none;
+      font-size:14px;
     }
   </style>
 </head>
 
 <body>
+<div class="wrap">
 
-  <h1>Cadastro de Cliente</h1>
+  <!-- HEADER COM LOGO + BOTÕES -->
+  <header>
+    <div class="title">
+      <img src="logo.jpeg" alt="Preventiva Náutica" class="logo">
+      <div>
+        <h1>Cadastro de Cliente</h1>
+        <div class="sub">Electro Auto Náutica — Controle de Preventiva</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <button class="btn" onclick="window.location.href='/'">Painel</button>
+      <button class="btn" onclick="window.location.href='/'">Preventiva</button>
+      <button class="btn active" onclick="window.location.href='/cadastro'">Clientes</button>
+    </div>
+  </header>
 
   <!-- PROPRIETÁRIO -->
   <div class="card">
@@ -162,54 +237,56 @@
   </div>
 
   <!-- BOTÃO -->
-  <button onclick="salvar()">Salvar Cadastro</button>
+  <button class="btn-primary" onclick="salvar()">Salvar Cadastro</button>
 
   <div class="ok" id="okBox">Cadastro realizado com sucesso!</div>
   <div class="erro" id="erroBox">Erro ao cadastrar. Verifique os campos.</div>
 
-  <script>
-    async function salvar(){
-      const payload = {
-        nome_proprietario: document.getElementById("nome_proprietario").value,
-        telefone_proprietario: document.getElementById("telefone_proprietario").value,
-        email_proprietario: document.getElementById("email_proprietario").value,
+</div>
 
-        nome_embarcacao: document.getElementById("nome_embarcacao").value,
-        marina: document.getElementById("marina").value,
-        obs_embarcacao: document.getElementById("obs_embarcacao").value,
+<script>
+  async function salvar(){
+    const payload = {
+      nome_proprietario: document.getElementById("nome_proprietario").value,
+      telefone_proprietario: document.getElementById("telefone_proprietario").value,
+      email_proprietario: document.getElementById("email_proprietario").value,
 
-        marca_motor: document.getElementById("marca_motor").value,
-        modelo_motor: document.getElementById("modelo_motor").value,
-        imei_motor: document.getElementById("imei_motor").value,
+      nome_embarcacao: document.getElementById("nome_embarcacao").value,
+      marina: document.getElementById("marina").value,
+      obs_embarcacao: document.getElementById("obs_embarcacao").value,
 
-        nome_marinheiro: document.getElementById("nome_marinheiro").value,
-        telefone_marinheiro: document.getElementById("telefone_marinheiro").value,
+      marca_motor: document.getElementById("marca_motor").value,
+      modelo_motor: document.getElementById("modelo_motor").value,
+      imei_motor: document.getElementById("imei_motor").value,
 
-        observacoes: document.getElementById("observacoes").value
-      };
+      nome_marinheiro: document.getElementById("nome_marinheiro").value,
+      telefone_marinheiro: document.getElementById("telefone_marinheiro").value,
 
-      try{
-        const r = await fetch("/api/clientes", {
-          method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body:JSON.stringify(payload)
-        });
+      observacoes: document.getElementById("observacoes").value
+    };
 
-        const j = await r.json();
+    try{
+      const r = await fetch("/api/clientes", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(payload)
+      });
 
-        if(r.ok){
-          document.getElementById("okBox").style.display="block";
-          document.getElementById("erroBox").style.display="none";
-        } else {
-          document.getElementById("okBox").style.display="none";
-          document.getElementById("erroBox").style.display="block";
-        }
-      } catch(err){
+      const j = await r.json(); // mantido caso queira debugar depois
+
+      if(r.ok){
+        document.getElementById("okBox").style.display="block";
+        document.getElementById("erroBox").style.display="none";
+      } else {
         document.getElementById("okBox").style.display="none";
         document.getElementById("erroBox").style.display="block";
       }
+    } catch(err){
+      document.getElementById("okBox").style.display="none";
+      document.getElementById("erroBox").style.display="block";
     }
-  </script>
+  }
+</script>
 
 </body>
 </html>
