@@ -139,7 +139,7 @@ db = load_db()
 def ensure_defaults_for_ativo(ativo):
     # plano preventivo default
     if "plano_preventivo" not in ativo or not isinstance(
-        ativo["plano_preventivo"], list
+        ativo.get("plano_preventivo"), list
     ):
         ativo["plano_preventivo"] = (
             DEFAULT_PLANO_HORAS
@@ -147,13 +147,19 @@ def ensure_defaults_for_ativo(ativo):
             else DEFAULT_PLANO_KM
         )
 
-    # base cumulativa
-    ativo.setdefault("horas_base_total", 0.0)  # quando medida_base = hora
-    ativo.setdefault("km_base_total", 0.0)  # quando medida_base = km
+    # base cumulativa antiga (km) – mantida para compatibilidade
+    ativo.setdefault("horas_base_total", 0.0)
+    ativo.setdefault("km_base_total", 0.0)
 
     # estado de horas paradas
     ativo.setdefault(
         "paradas_state", {"last_ts": 0, "last_motor": False, "acc_s": 0}
+    )
+
+    # NOVO: horímetro cumulativo interno
+    ativo.setdefault("horas_totais", 0.0)
+    ativo.setdefault(
+        "horimetro_state", {"last_ts": 0, "last_motor": False}
     )
 
 
@@ -189,6 +195,8 @@ def bootstrap_db_if_needed():
         "horas_base_total": 0.0,
         "km_base_total": 0.0,
         "paradas_state": {"last_ts": 0, "last_motor": False, "acc_s": 0},
+        "horas_totais": 0.0,
+        "horimetro_state": {"last_ts": 0, "last_motor": False},
     }
 
     db["ativos"] = [ativo]
@@ -275,7 +283,7 @@ def obter_dados_brasilsat_por_imei(imei: str):
     return {
         "imei": data.get("imei"),
         "motor_ligado": bool(int(data.get("accstatus") or 0)),
-        "horas_reais": horas_reais,
+        "horas_reais": horas_reais,      # tempo do ciclo atual (BrasilSat)
         "km_reais": km_total,
         "tensao_bateria": float(data.get("externalpower") or 0),
         "servertime": int(data.get("servertime") or time.time()),
@@ -301,6 +309,7 @@ def atualizar_horas_paradas(ativo, servertime: int, motor_ligado: bool):
         acc_s += delta
 
     if (not last_motor) and motor_ligado:
+        # ligou o motor -> zera horas paradas
         acc_s = 0
 
     st["last_ts"] = servertime
@@ -309,6 +318,40 @@ def atualizar_horas_paradas(ativo, servertime: int, motor_ligado: bool):
     ativo["paradas_state"] = st
 
     return round(acc_s / 3600.0, 2)
+
+
+# =========================
+#  HORÍMETRO CUMULATIVO
+# =========================
+def atualizar_horas_totais(ativo, servertime: int, motor_ligado: bool):
+    """
+    Acumula horas de motor ligado usando servertime.
+    Não depende do acctime (que zera a cada ciclo).
+    """
+    st = ativo.get("horimetro_state") or {}
+    last_ts = int(st.get("last_ts") or 0)
+    last_motor = bool(st.get("last_motor") or False)
+    total = float(ativo.get("horas_totais") or 0.0)
+
+    if last_ts == 0:
+        # primeira leitura, só inicializa
+        st["last_ts"] = servertime
+        st["last_motor"] = motor_ligado
+        ativo["horimetro_state"] = st
+        ativo["horas_totais"] = total
+        return round(total, 2)
+
+    delta = max(0, servertime - last_ts)
+    if last_motor:
+        # estava ligado nesse intervalo => soma ao horímetro
+        total += delta / 3600.0
+
+    st["last_ts"] = servertime
+    st["last_motor"] = motor_ligado
+    ativo["horimetro_state"] = st
+    ativo["horas_totais"] = total
+
+    return round(total, 2)
 
 
 # =========================
@@ -361,6 +404,8 @@ def add_ativo():
         "horas_base_total": 0.0,
         "km_base_total": 0.0,
         "paradas_state": {"last_ts": 0, "last_motor": False, "acc_s": 0},
+        "horas_totais": 0.0,
+        "horimetro_state": {"last_ts": 0, "last_motor": False},
     }
 
     db.setdefault("ativos", []).append(ativo)
@@ -429,59 +474,78 @@ def dados():
     ensure_defaults_for_ativo(ativo)
     bs = obter_dados_brasilsat_por_imei(ativo["imei"])
 
-    horas_ajustadas = round(
-        bs["horas_reais"] + (ativo["offset"] if ativo["medida_base"] == "hora" else 0),
-        2,
-    )
-    km_ajustados = round(
-        bs["km_reais"] + (ativo["offset"] if ativo["medida_base"] == "km" else 0), 2
-    )
+    # Leitura da BrasilSat
+    horas_reais_brasilsat = bs["horas_reais"]
+    km_reais_brasilsat = bs["km_reais"]
 
-    horas_paradas = atualizar_horas_paradas(
-        ativo, bs["servertime"], bs["motor_ligado"]
-    )
-
+    # Offset por tipo de medida
     if ativo["medida_base"] == "hora":
-        horas_totais = round(
-            float(ativo.get("horas_base_total", 0.0)) + horas_ajustadas, 2
+        horas_paradas = atualizar_horas_paradas(
+            ativo, bs["servertime"], bs["motor_ligado"]
         )
-        uso_base = horas_ajustadas
+        horas_totais = atualizar_horas_totais(
+            ativo, bs["servertime"], bs["motor_ligado"]
+        )
+
+        uso_base = horas_totais          # "hora da embarcação" (cumulativa)
         unidade_base = "h"
+
+        payload = {
+            "ativo_id": ativo["id"],
+            "nome": ativo["nome"],
+            "tipo": ativo["tipo"],
+            "imei": bs["imei"],
+            "motor_ligado": bs["motor_ligado"],
+            "tensao_bateria": bs["tensao_bateria"],
+            "servertime": bs["servertime"],
+            "horas_reais_brasilsat": horas_reais_brasilsat,
+            "km_reais_brasilsat": km_reais_brasilsat,
+            "offset": ativo["offset"],
+            "horas_motor": horas_reais_brasilsat,   # ciclo atual (referência)
+            "uso_base": uso_base,
+            "unidade_base": unidade_base,
+            "medida_base": ativo["medida_base"],
+            "horas_paradas": horas_paradas,
+            "horas_totais": horas_totais,
+        }
+
     else:
+        # medida_base = "km" (usa BrasilSat como odômetro)
+        km_ajustados = round(
+            km_reais_brasilsat + (ativo["offset"] or 0.0), 2
+        )
         km_totais = round(
             float(ativo.get("km_base_total", 0.0)) + km_ajustados, 2
         )
-        uso_base = km_ajustados
+
+        horas_paradas = atualizar_horas_paradas(
+            ativo, bs["servertime"], bs["motor_ligado"]
+        )
+
+        uso_base = km_totais
         unidade_base = "km"
 
+        payload = {
+            "ativo_id": ativo["id"],
+            "nome": ativo["nome"],
+            "tipo": ativo["tipo"],
+            "imei": bs["imei"],
+            "motor_ligado": bs["motor_ligado"],
+            "tensao_bateria": bs["tensao_bateria"],
+            "servertime": bs["servertime"],
+            "horas_reais_brasilsat": horas_reais_brasilsat,
+            "km_reais_brasilsat": km_reais_brasilsat,
+            "offset": ativo["offset"],
+            "km_total": km_ajustados,
+            "uso_base": uso_base,
+            "unidade_base": unidade_base,
+            "medida_base": ativo["medida_base"],
+            "horas_paradas": horas_paradas,
+            "km_totais": km_totais,
+            "km_base_total": float(ativo.get("km_base_total", 0.0)),
+        }
+
     save_db(db)
-
-    payload = {
-        "ativo_id": ativo["id"],
-        "nome": ativo["nome"],
-        "tipo": ativo["tipo"],
-        "imei": bs["imei"],
-        "motor_ligado": bs["motor_ligado"],
-        "tensao_bateria": bs["tensao_bateria"],
-        "servertime": bs["servertime"],
-        "horas_reais_brasilsat": bs["horas_reais"],
-        "km_reais_brasilsat": bs["km_reais"],
-        "offset": ativo["offset"],
-        "horas_motor": horas_ajustadas,
-        "km_total": km_ajustados,
-        "uso_base": uso_base,
-        "unidade_base": unidade_base,
-        "medida_base": ativo["medida_base"],
-        "horas_paradas": horas_paradas,
-    }
-
-    if ativo["medida_base"] == "hora":
-        payload["horas_totais"] = horas_totais
-        payload["horas_base_total"] = float(ativo.get("horas_base_total", 0.0))
-    else:
-        payload["km_totais"] = km_totais
-        payload["km_base_total"] = float(ativo.get("km_base_total", 0.0))
-
     return jsonify(payload)
 
 
@@ -498,13 +562,19 @@ def preventiva():
     ensure_defaults_for_ativo(ativo)
     bs = obter_dados_brasilsat_por_imei(ativo["imei"])
 
-    uso_ajustado = round(
-        (bs["horas_reais"] if ativo["medida_base"] == "hora" else bs["km_reais"])
-        + ativo["offset"],
-        2,
-    )
+    if ativo["medida_base"] == "hora":
+        # usa horímetro cumulativo interno
+        uso_ajustado = atualizar_horas_totais(
+            ativo, bs["servertime"], bs["motor_ligado"]
+        )
+        unidade = "h"
+    else:
+        # usa odômetro da BrasilSat + offset
+        uso_ajustado = round(bs["km_reais"] + (ativo["offset"] or 0.0), 2)
+        unidade = "km"
 
     tarefas = calcular_status_preventiva(uso_ajustado, ativo["plano_preventivo"])
+    save_db(db)
 
     return jsonify(
         {
@@ -513,7 +583,7 @@ def preventiva():
             "tipo": ativo["tipo"],
             "imei": bs["imei"],
             "uso_ajustado": uso_ajustado,
-            "unidade": "h" if ativo["medida_base"] == "hora" else "km",
+            "unidade": unidade,
             "tarefas": tarefas,
         }
     )
@@ -626,22 +696,25 @@ def get_horas_totais():
         return jsonify({"erro": "Ativo atual não é por horas"}), 400
 
     bs = obter_dados_brasilsat_por_imei(ativo["imei"])
-    horas_ajustadas = round(bs["horas_reais"] + ativo["offset"], 2)
-    horas_totais = round(
-        float(ativo.get("horas_base_total", 0.0)) + horas_ajustadas, 2
+    horas_totais = atualizar_horas_totais(
+        ativo, bs["servertime"], bs["motor_ligado"]
     )
+    save_db(db)
 
     return jsonify(
         {
             "horas_totais": horas_totais,
-            "horas_base_total": float(ativo.get("horas_base_total", 0.0)),
-            "horas_motor_atual": horas_ajustadas,
+            "horas_motor_atual": bs["horas_reais"],  # ciclo da BrasilSat
         }
     )
 
 
 @app.post("/config/horas_totais")
 def set_horas_totais():
+    """
+    Botão de ajuste do horímetro:
+    você informa o total desejado, e a partir daí ele continua somando.
+    """
     ativo = get_ativo_atual()
     if not ativo:
         bootstrap_db_if_needed()
@@ -662,17 +735,15 @@ def set_horas_totais():
     except Exception:
         return jsonify({"erro": "horas_totais deve ser número"}), 400
 
-    bs = obter_dados_brasilsat_por_imei(ativo["imei"])
-    horas_ajustadas = round(bs["horas_reais"] + ativo["offset"], 2)
-
-    ativo["horas_base_total"] = round(horas_totais - horas_ajustadas, 2)
+    ativo["horas_totais"] = horas_totais
+    # reseta o estado do horímetro pra evitar somas erradas
+    ativo["horimetro_state"] = {"last_ts": 0, "last_motor": False}
     save_db(db)
 
     return jsonify(
         {
-            "mensagem": "Horas totais atualizadas",
+            "mensagem": "Horas totais ajustadas",
             "horas_totais": horas_totais,
-            "horas_base_total": float(ativo["horas_base_total"]),
         }
     )
 
@@ -692,7 +763,7 @@ def get_km_totais():
         return jsonify({"erro": "Ativo atual não é por km"}), 400
 
     bs = obter_dados_brasilsat_por_imei(ativo["imei"])
-    km_ajustados = round(bs["km_reais"] + ativo["offset"], 2)
+    km_ajustados = round(bs["km_reais"] + (ativo["offset"] or 0.0), 2)
     km_totais = round(
         float(ativo.get("km_base_total", 0.0)) + km_ajustados, 2
     )
@@ -729,7 +800,7 @@ def set_km_totais():
         return jsonify({"erro": "km_totais deve ser número"}), 400
 
     bs = obter_dados_brasilsat_por_imei(ativo["imei"])
-    km_ajustados = round(bs["km_reais"] + ativo["offset"], 2)
+    km_ajustados = round(bs["km_reais"] + (ativo["offset"] or 0.0), 2)
 
     ativo["km_base_total"] = round(km_totais - km_ajustados, 2)
     save_db(db)
