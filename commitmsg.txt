@@ -1,2 +1,1 @@
-﻿update: adicionada rota /painel_geral, rota /painel_geral.html e rota /api/clientes
-ajuste completo no server.py conforme solicitado
+﻿feat: rota painel geral e navegacao entre paineis

@@ -420,6 +420,10 @@ def atualizar_horas_totais(ativo, servertime: int, motor_ligado: bool):
 # =========================
 @app.get("/")
 def dashboard():
+@app.get('/painel_geral')
+def painel_geral():
+    return send_from_directory('.', 'painel_geral.html')
+
     return send_from_directory(".", "dashboard.html")
 
 
