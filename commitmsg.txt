@@ -1,4 +1,1 @@
-﻿feat: cadastro de ativos + preventiva por horas/km
-
-- server: suporte a múltiplos ativos (lancha/caminhão), base hora/km, planos por ativo, db.json
-- dashboard: nova aba Ativos (CRUD + seleção), preventiva por unidade, painel unificado
+﻿deploy: suporte a horas totais, horas paradas e nova estrutura server

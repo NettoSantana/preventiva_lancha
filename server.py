@@ -20,7 +20,7 @@ def get_token():
     r = requests.get(
         url,
         params={"time": now, "account": ACCOUNT, "signature": signature},
-        timeout=10
+        timeout=15
     )
     r.raise_for_status()
     j = r.json()
@@ -30,7 +30,7 @@ def get_token():
 
 def track(access_token: str, imei: str):
     url = f"{BASE_URL}/api/track"
-    r = requests.get(url, params={"access_token": access_token, "imeis": imei}, timeout=10)
+    r = requests.get(url, params={"access_token": access_token, "imeis": imei}, timeout=15)
     r.raise_for_status()
     j = r.json()
     if j.get("code") != 0:
@@ -39,6 +39,8 @@ def track(access_token: str, imei: str):
 
 # =========================
 #  "DB" SIMPLES EM JSON
+#  (Railway é efêmero, então
+#   precisamos bootstrapar)
 # =========================
 DB_FILE = os.path.join(os.path.dirname(__file__), "db.json")
 
@@ -55,6 +57,12 @@ DEFAULT_PLANO_KM = [
     {"nome": "Troca do filtro de combustível", "unidade": "km", "primeira_execucao": 20000, "intervalo": 20000, "avisar_antes": 1000},
 ]
 
+# ===== ATIVO DEFAULT (bootstrap) =====
+BOOTSTRAP_IMEI = os.getenv("BRASILSAT_IMEI", "355468593059041")
+BOOTSTRAP_NOME = os.getenv("BOOTSTRAP_NOME", "Electro Auto Náutica — Embarcação 01")
+BOOTSTRAP_TIPO = os.getenv("BOOTSTRAP_TIPO", "lancha")      # lancha | caminhao
+BOOTSTRAP_MEDIDA = os.getenv("BOOTSTRAP_MEDIDA", "hora")    # hora | km
+
 def load_db():
     if not os.path.exists(DB_FILE):
         return {"ativos": [], "ativo_atual_id": None}
@@ -69,19 +77,6 @@ def save_db(db):
         json.dump(db, f, ensure_ascii=False, indent=2)
 
 db = load_db()
-
-def get_ativo_atual():
-    ativos = db.get("ativos", [])
-    if not ativos:
-        return None
-    ativo_id = db.get("ativo_atual_id")
-    if ativo_id:
-        for a in ativos:
-            if a["id"] == ativo_id:
-                return a
-    db["ativo_atual_id"] = ativos[0]["id"]
-    save_db(db)
-    return ativos[0]
 
 def ensure_defaults_for_ativo(ativo):
     # plano preventivo default
@@ -98,6 +93,59 @@ def ensure_defaults_for_ativo(ativo):
         "last_motor": False,
         "acc_s": 0
     })
+
+def bootstrap_db_if_needed():
+    """Se Railway subir com db.json vazio, cria um ativo default automaticamente."""
+    ativos = db.get("ativos", [])
+    if ativos:
+        # já tem algo, só garantir defaults
+        for a in ativos:
+            ensure_defaults_for_ativo(a)
+        if not db.get("ativo_atual_id"):
+            db["ativo_atual_id"] = ativos[0]["id"]
+        save_db(db)
+        return
+
+    # cria ativo default
+    medida = BOOTSTRAP_MEDIDA.lower()
+    tipo = BOOTSTRAP_TIPO.lower()
+
+    if tipo not in ("lancha", "caminhao"):
+        tipo = "lancha"
+    if medida not in ("hora", "km"):
+        medida = "hora" if tipo == "lancha" else "km"
+
+    ativo = {
+        "id": uuid.uuid4().hex[:8],
+        "nome": BOOTSTRAP_NOME,
+        "tipo": tipo,
+        "imei": BOOTSTRAP_IMEI,
+        "medida_base": medida,
+        "offset": 0.0,
+        "plano_preventivo": DEFAULT_PLANO_HORAS if medida == "hora" else DEFAULT_PLANO_KM,
+        "horas_base_total": 0.0,
+        "km_base_total": 0.0,
+        "paradas_state": {"last_ts": 0, "last_motor": False, "acc_s": 0}
+    }
+
+    db["ativos"] = [ativo]
+    db["ativo_atual_id"] = ativo["id"]
+    save_db(db)
+
+bootstrap_db_if_needed()
+
+def get_ativo_atual():
+    ativos = db.get("ativos", [])
+    if not ativos:
+        return None
+    ativo_id = db.get("ativo_atual_id")
+    if ativo_id:
+        for a in ativos:
+            if a["id"] == ativo_id:
+                return a
+    db["ativo_atual_id"] = ativos[0]["id"]
+    save_db(db)
+    return ativos[0]
 
 # =========================
 #  LÓGICA DE PREVENTIVA
@@ -150,7 +198,6 @@ def obter_dados_brasilsat_por_imei(imei: str):
     acctime_s = int(data.get("acctime") or 0)
     horas_reais = round(acctime_s / 3600.0, 2)
 
-    # mileage geralmente vem em metros -> converter pra km
     mileage_m = float(data.get("mileage") or 0)
     km_total = round(mileage_m / 1000.0, 2)
 
@@ -172,7 +219,6 @@ def atualizar_horas_paradas(ativo, servertime: int, motor_ligado: bool):
     last_motor = bool(st.get("last_motor") or False)
     acc_s = int(st.get("acc_s") or 0)
 
-    # init quando não tinha estado
     if last_ts == 0:
         last_ts = servertime
         last_motor = motor_ligado
@@ -183,7 +229,7 @@ def atualizar_horas_paradas(ativo, servertime: int, motor_ligado: bool):
         acc_s += delta
 
     if (not last_motor) and motor_ligado:
-        acc_s = 0  # zera quando liga
+        acc_s = 0
 
     st["last_ts"] = servertime
     st["last_motor"] = motor_ligado
@@ -197,7 +243,6 @@ def atualizar_horas_paradas(ativo, servertime: int, motor_ligado: bool):
 # =========================
 @app.get("/")
 def dashboard():
-    # dashboard.html na mesma pasta
     return send_from_directory(".", "dashboard.html")
 
 # -------- ATIVOS (CRUD) --------
@@ -240,6 +285,7 @@ def add_ativo():
     db.setdefault("ativos", []).append(ativo)
     if not db.get("ativo_atual_id"):
         db["ativo_atual_id"] = ativo["id"]
+    ensure_defaults_for_ativo(ativo)
     save_db(db)
 
     return jsonify({"mensagem": "Ativo criado", "ativo": ativo})
@@ -286,7 +332,10 @@ def selecionar_ativo(ativo_id):
 def dados():
     ativo = get_ativo_atual()
     if not ativo:
-        return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
 
     ensure_defaults_for_ativo(ativo)
     bs = obter_dados_brasilsat_por_imei(ativo["imei"])
@@ -294,10 +343,8 @@ def dados():
     horas_ajustadas = round(bs["horas_reais"] + (ativo["offset"] if ativo["medida_base"] == "hora" else 0), 2)
     km_ajustados = round(bs["km_reais"] + (ativo["offset"] if ativo["medida_base"] == "km" else 0), 2)
 
-    # horas paradas por ativo (zera ao ligar)
     horas_paradas = atualizar_horas_paradas(ativo, bs["servertime"], bs["motor_ligado"])
 
-    # totais cumulativos por ativo (manual + brasilsat ajustado)
     if ativo["medida_base"] == "hora":
         horas_totais = round(float(ativo.get("horas_base_total", 0.0)) + horas_ajustadas, 2)
         uso_base = horas_ajustadas
@@ -329,7 +376,6 @@ def dados():
         "unidade_base": unidade_base,
         "medida_base": ativo["medida_base"],
 
-        # novos campos
         "horas_paradas": horas_paradas
     }
 
@@ -347,7 +393,10 @@ def dados():
 def preventiva():
     ativo = get_ativo_atual()
     if not ativo:
-        return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
 
     ensure_defaults_for_ativo(ativo)
     bs = obter_dados_brasilsat_por_imei(ativo["imei"])
@@ -374,7 +423,10 @@ def preventiva():
 def set_offset():
     ativo = get_ativo_atual()
     if not ativo:
-        return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
 
     data = request.json or {}
     valor = data.get("offset")
@@ -393,7 +445,10 @@ def set_offset():
 def get_offset():
     ativo = get_ativo_atual()
     if not ativo:
-        return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
     return jsonify({"offset": ativo["offset"], "nome": ativo["nome"], "medida_base": ativo["medida_base"]})
 
 # -------- CONFIG PLANO (ativo atual) --------
@@ -401,7 +456,10 @@ def get_offset():
 def get_plano():
     ativo = get_ativo_atual()
     if not ativo:
-        return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
     ensure_defaults_for_ativo(ativo)
     return jsonify({"plano": ativo["plano_preventivo"], "medida_base": ativo["medida_base"]})
 
@@ -409,7 +467,10 @@ def get_plano():
 def set_plano():
     ativo = get_ativo_atual()
     if not ativo:
-        return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
 
     data = request.json or {}
     plano = data.get("plano")
@@ -433,12 +494,15 @@ def set_plano():
     save_db(db)
     return jsonify({"mensagem": "Plano atualizado", "total_itens": len(novo)})
 
-# -------- NOVO: CONFIG HORAS TOTAIS (ativo hora) --------
+# -------- CONFIG HORAS TOTAIS (ativo hora) --------
 @app.get("/config/horas_totais")
 def get_horas_totais():
     ativo = get_ativo_atual()
     if not ativo:
-        return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
     ensure_defaults_for_ativo(ativo)
 
     if ativo["medida_base"] != "hora":
@@ -458,7 +522,10 @@ def get_horas_totais():
 def set_horas_totais():
     ativo = get_ativo_atual()
     if not ativo:
-        return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
     ensure_defaults_for_ativo(ativo)
 
     if ativo["medida_base"] != "hora":
@@ -476,7 +543,6 @@ def set_horas_totais():
     bs = obter_dados_brasilsat_por_imei(ativo["imei"])
     horas_ajustadas = round(bs["horas_reais"] + ativo["offset"], 2)
 
-    # base = total_digitado - horas_motor_atual
     ativo["horas_base_total"] = round(horas_totais - horas_ajustadas, 2)
     save_db(db)
 
@@ -486,12 +552,15 @@ def set_horas_totais():
         "horas_base_total": float(ativo["horas_base_total"])
     })
 
-# -------- NOVO: CONFIG KM TOTAIS (ativo km) --------
+# -------- CONFIG KM TOTAIS (ativo km) --------
 @app.get("/config/km_totais")
 def get_km_totais():
     ativo = get_ativo_atual()
     if not ativo:
-        return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
     ensure_defaults_for_ativo(ativo)
 
     if ativo["medida_base"] != "km":
@@ -511,7 +580,10 @@ def get_km_totais():
 def set_km_totais():
     ativo = get_ativo_atual()
     if not ativo:
-        return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
     ensure_defaults_for_ativo(ativo)
 
     if ativo["medida_base"] != "km":
