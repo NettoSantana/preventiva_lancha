@@ -1,1 +1,1 @@
-﻿commit: adiciona rota /painel_geral ao server.py
+﻿feat: adiciona painel_geral e GET /api/clientes para integração do painel geral
