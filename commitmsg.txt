@@ -1,6 +1,4 @@
-﻿fix: reduzir chamadas à BrasilSat com cache de token e track
-
-- adiciona cache de token (authorization) com validade de ~50min
-- adiciona cache de track por IMEI com TTL de 20s
-- evita erro "Over TPS Limit" na rota /dados e /preventiva
-- mantém todas as rotas e regras de horímetro/preventiva intactas
+﻿feat: adiciona persistência de clientes
+- cria clientes.json
+- adiciona rota POST /api/clientes
+- integra cadastro.html com backend

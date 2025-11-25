@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Painel Geral — Preventiva Náutica</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0b1020; --bg2:#0f172a; --card:#121a2e; --card2:#0f172b;
+      --ink:#e5e7eb; --muted:#94a3b8; --accent:#38bdf8;
+      --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --line:#1f2a44;
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      background:
+        radial-gradient(1200px 700px at 20% -10%, #12214a 0%, transparent 70%),
+        radial-gradient(1400px 800px at 120% 10%, #0b3a55 0%, transparent 60%),
+        linear-gradient(180deg,var(--bg),var(--bg2));
+      color:var(--ink);
+    }
+    .wrap{max-width:1200px;margin:24px auto;padding:0 16px}
+    header{
+      display:flex;align-items:center;justify-content:space-between;
+      gap:16px;flex-wrap:wrap;margin-bottom:18px;
+    }
+    .title{display:flex;gap:12px;align-items:center}
+    .logo{
+      width:56px;height:56px;border-radius:12px;object-fit:cover;
+      box-shadow:0 10px 30px rgba(56,189,248,.25);
+    }
+    h1{margin:0;font-size:22px;letter-spacing:.3px}
+    .sub{margin-top:3px;font-size:13px;color:var(--muted)}
+    .pill{
+      padding:6px 10px;border-radius:999px;font-size:12px;
+      background:#0a1325;border:1px solid var(--line);color:var(--muted);
+    }
+    .btn{
+      padding:8px 12px;border-radius:10px;border:1px solid var(--line);
+      background:#0a1325;color:var(--ink);cursor:pointer;font-size:13px;
+    }
+    .btn.primary{
+      border-color:rgba(56,189,248,.7);
+      color:var(--accent);
+    }
+    .btn.small{padding:6px 10px;font-size:12px;border-radius:999px}
+    .grid{
+      display:grid;gap:16px;grid-template-columns:repeat(12,1fr);
+    }
+    .col-3{grid-column:span 3}
+    .col-4{grid-column:span 4}
+    .col-5{grid-column:span 5}
+    .col-6{grid-column:span 6}
+    .col-7{grid-column:span 7}
+    .col-8{grid-column:span 8}
+    .col-9{grid-column:span 9}
+    .col-12{grid-column:span 12}
+    @media (max-width:900px){
+      .col-3,.col-4,.col-5,.col-6,.col-7,.col-8,.col-9{grid-column:span 12}
+    }
+    .card{
+      background:linear-gradient(180deg,var(--card),var(--card2));
+      border-radius:var(--radius);
+      border:1px solid var(--line);
+      padding:14px 14px 12px;
+      box-shadow:0 6px 18px rgba(0,0,0,.35);
+    }
+    .card h2{
+      margin:0 0 6px;
+      font-size:14px;font-weight:700;color:var(--accent);
+      text-transform:uppercase;letter-spacing:.4px;
+    }
+    .muted{color:var(--muted);font-size:13px}
+    .row{
+      display:flex;align-items:center;justify-content:space-between;
+      gap:10px;flex-wrap:wrap;
+    }
+    input{
+      width:100%;padding:8px 10px;border-radius:10px;
+      border:1px solid var(--line);
+      background:#0a1325;color:var(--ink);outline:none;
+      font-size:13px;
+    }
+    input::placeholder{color:rgba(148,163,184,.9)}
+    .lista-clientes{
+      display:flex;flex-direction:column;gap:8px;margin-top:8px;
+      max-height:520px;overflow:auto;
+    }
+    .cliente-card{
+      border-radius:12px;
+      border:1px solid rgba(15,23,42,.9);
+      padding:10px 10px 9px;
+      background:radial-gradient(600px 400px at 0 0,rgba(56,189,248,.12),transparent 60%),
+                 #020617;
+      cursor:pointer;
+      transition:border .18s, background .18s, transform .12s;
+    }
+    .cliente-card:hover{
+      border-color:rgba(56,189,248,.6);
+      transform:translateY(-1px);
+    }
+    .cliente-card.active{
+      border-color:var(--accent);
+      box-shadow:0 0 0 1px rgba(56,189,248,.45);
+      background:radial-gradient(800px 600px at 0 0,rgba(56,189,248,.22),transparent 65%),
+                 #020617;
+    }
+    .cliente-nome{
+      font-size:14px;font-weight:600;margin-bottom:2px;
+    }
+    .cliente-meta{
+      font-size:12px;color:var(--muted);
+    }
+    .tag{
+      display:inline-flex;align-items:center;gap:4px;
+      border-radius:999px;border:1px solid var(--line);
+      padding:2px 8px;font-size:11px;color:var(--muted);
+      margin-top:4px;
+    }
+    .tag-dot{
+      width:6px;height:6px;border-radius:999px;
+      background:var(--accent);
+    }
+    .sec-title{
+      font-size:13px;font-weight:600;margin:0 0 6px;
+      color:var(--muted);text-transform:uppercase;letter-spacing:.12em;
+    }
+    .details-grid{
+      display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:8px;
+    }
+    @media(max-width:700px){
+      .details-grid{grid-template-columns:repeat(1,minmax(0,1fr))}
+    }
+    .detail-line{
+      font-size:13px;color:var(--muted);
+    }
+    .detail-label{color:rgba(148,163,184,.95);font-size:12px}
+    table{
+      width:100%;border-collapse:collapse;font-size:13px;margin-top:6px;
+    }
+    th,td{
+      padding:8px 6px;border-bottom:1px solid var(--line);
+      text-align:left;
+    }
+    th{color:var(--muted);font-weight:600;font-size:12px}
+    td.right,th.right{text-align:right}
+    .equip-nome{font-weight:500}
+    .badge{
+      display:inline-flex;align-items:center;gap:5px;
+      border-radius:999px;border:1px solid var(--line);
+      padding:2px 8px;font-size:11px;color:var(--muted);
+    }
+    .badge.dot-ok::before{
+      content:"";width:6px;height:6px;border-radius:999px;
+      background:var(--ok);
+    }
+    .empty-state{
+      padding:18px 10px 8px;
+      font-size:13px;color:var(--muted);
+    }
+    .link-inline{
+      color:var(--accent);cursor:pointer;text-decoration:none;
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="title">
+      <img src="logo.jpeg" alt="Preventiva Náutica" class="logo">
+      <div>
+        <h1>Painel Geral — Preventiva Náutica</h1>
+        <div class="sub">
+          Visão por cliente → embarcações → abrir painel técnico.
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn" onclick="window.location.href='/'">Ir para painel interno</button>
+      <button class="btn primary" onclick="window.location.href='/cadastro'">Novo cliente</button>
+    </div>
+  </header>
+
+  <section class="grid">
+    <!-- COLUNA ESQUERDA: LISTA DE CLIENTES -->
+    <div class="col-4">
+      <div class="card">
+        <div class="row" style="margin-bottom:6px">
+          <h2>Clientes</h2>
+          <span class="pill" id="badgeQtdClientes">0 clientes</span>
+        </div>
+        <label class="muted" style="font-size:12px;margin-bottom:4px;display:block">
+          Buscar por nome do proprietário ou embarcação
+        </label>
+        <input id="buscaCliente" placeholder="Ex.: João, Lancha Bahia, etc." />
+
+        <div class="lista-clientes" id="listaClientes">
+          <!-- preenchido via JS -->
+        </div>
+
+        <div class="empty-state" id="emptyClientes" style="display:none">
+          Nenhum cliente cadastrado ainda.<br/>
+          Use o botão <span class="link-inline" onclick="window.location.href='/cadastro'">Novo cliente</span> para incluir o primeiro.
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUNA DIREITA: DETALHES + EQUIPAMENTOS -->
+    <div class="col-8">
+      <div class="card" id="cardResumoCliente">
+        <h2>Resumo do cliente</h2>
+        <div id="clienteResumoVazio" class="empty-state">
+          Selecione um cliente na coluna à esquerda para ver os detalhes.
+        </div>
+        <div id="clienteResumo" style="display:none">
+          <div class="row" style="margin-bottom:8px">
+            <div>
+              <div class="cliente-nome" id="resNome"></div>
+              <div class="cliente-meta" id="resEmbarcacao"></div>
+            </div>
+            <div>
+              <span class="badge dot-ok" id="resQtdEquip">
+                0 equipamentos
+              </span>
+            </div>
+          </div>
+
+          <div class="details-grid">
+            <div class="detail-line">
+              <div class="detail-label">Telefone</div>
+              <div id="resTelefone">--</div>
+            </div>
+            <div class="detail-line">
+              <div class="detail-label">E-mail</div>
+              <div id="resEmail">--</div>
+            </div>
+            <div class="detail-line">
+              <div class="detail-label">Porto / Local</div>
+              <div id="resPorto">--</div>
+            </div>
+            <div class="detail-line">
+              <div class="detail-label">Observações</div>
+              <div id="resObs">--</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <div class="row">
+          <h2>Equipamentos do cliente</h2>
+          <span class="muted" id="hintEquipamentos" style="font-size:12px">
+            Selecione um cliente para listar as embarcações monitoradas.
+          </span>
+        </div>
+
+        <div id="equipamentosVazio" class="empty-state">
+          Nenhum cliente selecionado.
+        </div>
+
+        <div id="equipamentosTabela" style="display:none">
+          <table>
+            <thead>
+              <tr>
+                <th>Embarcação</th>
+                <th>Tipo</th>
+                <th>IMEI</th>
+                <th>Medida</th>
+                <th class="right">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyEquipamentos">
+              <!-- preenchido via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  const ENDPOINT_CLIENTES = "/api/clientes";
+  const ENDPOINT_ATIVOS   = "/ativos";
+
+  let clientes = [];
+  let ativos   = [];
+  let clienteSelecionadoId = null;
+
+  const elListaClientes    = document.getElementById("listaClientes");
+  const elEmptyClientes    = document.getElementById("emptyClientes");
+  const elBuscaCliente     = document.getElementById("buscaCliente");
+  const elBadgeQtdClientes = document.getElementById("badgeQtdClientes");
+
+  const elCardResumoVazio  = document.getElementById("clienteResumoVazio");
+  const elCardResumo       = document.getElementById("clienteResumo");
+  const elResNome          = document.getElementById("resNome");
+  const elResEmbarcacao    = document.getElementById("resEmbarcacao");
+  const elResTelefone      = document.getElementById("resTelefone");
+  const elResEmail         = document.getElementById("resEmail");
+  const elResPorto         = document.getElementById("resPorto");
+  const elResObs           = document.getElementById("resObs");
+  const elResQtdEquip      = document.getElementById("resQtdEquip");
+
+  const elEquipVazio       = document.getElementById("equipamentosVazio");
+  const elEquipTabelaWrap  = document.getElementById("equipamentosTabela");
+  const elTbodyEquip       = document.getElementById("tbodyEquipamentos");
+  const elHintEquip        = document.getElementById("hintEquipamentos");
+
+  // Carrega clientes + ativos
+  async function carregarDados() {
+    try {
+      const [respCli, respAti] = await Promise.all([
+        fetch(ENDPOINT_CLIENTES, {cache:"no-store"}),
+        fetch(ENDPOINT_ATIVOS, {cache:"no-store"})
+      ]);
+
+      const dataCli = await respCli.json();
+      const dataAti = await respAti.json();
+
+      // Esperado: { clientes: [...] }
+      clientes = Array.isArray(dataCli)
+        ? dataCli
+        : (dataCli.clientes || []);
+
+      // Esperado: { ativos: [...], ativo_atual_id: "..." }
+      ativos = Array.isArray(dataAti)
+        ? dataAti
+        : (dataAti.ativos || []);
+
+      atualizarBadgeClientes();
+      renderListaClientes();
+      renderResumoCliente();
+      renderEquipamentos();
+
+    } catch (e) {
+      console.error("Erro ao carregar dados:", e);
+      elListaClientes.innerHTML = "";
+      elEmptyClientes.style.display = "block";
+      elBadgeQtdClientes.textContent = "erro ao carregar";
+    }
+  }
+
+  function atualizarBadgeClientes() {
+    const qtd = clientes.length;
+    elBadgeQtdClientes.textContent =
+      qtd === 0 ? "0 clientes" : (qtd === 1 ? "1 cliente" : `${qtd} clientes`);
+    elEmptyClientes.style.display = qtd ? "none" : "block";
+  }
+
+  // Renderiza a lista de clientes com filtro
+  function renderListaClientes() {
+    const termo = (elBuscaCliente.value || "").toLowerCase().trim();
+
+    const filtrados = clientes.filter(c => {
+      const nome = String(c.nome_proprietario || "").toLowerCase();
+      const emb  = String(c.nome_embarcacao || "").toLowerCase();
+      if (!termo) return true;
+      return nome.includes(termo) || emb.includes(termo);
+    });
+
+    elListaClientes.innerHTML = "";
+
+    if (!filtrados.length) {
+      elEmptyClientes.style.display = "block";
+      return;
+    }
+    elEmptyClientes.style.display = "none";
+
+    filtrados.forEach(cli => {
+      const div = document.createElement("div");
+      div.className = "cliente-card" + (cli.id === clienteSelecionadoId ? " active" : "");
+      div.onclick = () => {
+        clienteSelecionadoId = cli.id;
+        renderListaClientes();
+        renderResumoCliente();
+        renderEquipamentos();
+      };
+
+      const qtdEquip = contarEquipamentosCliente(cli);
+      const porto = cli.porto || cli.porto_local || "";
+
+      div.innerHTML = `
+        <div class="cliente-nome">${cli.nome_proprietario || "Sem nome"}</div>
+        <div class="cliente-meta">
+          ${cli.nome_embarcacao ? cli.nome_embarcacao : "Embarcação não informada"}
+        </div>
+        <div class="cliente-meta">
+          ${porto ? ("Porto: " + porto) : ""}
+        </div>
+        <div class="tag">
+          <span class="tag-dot"></span>
+          <span>${qtdEquip === 1 ? "1 equipamento" : (qtdEquip + " equipamentos")}</span>
+        </div>
+      `;
+      elListaClientes.appendChild(div);
+    });
+  }
+
+  function contarEquipamentosCliente(cli) {
+    const imeiCli = String(cli.imei_motor || "").trim();
+    if (!imeiCli) return 0;
+    return ativos.filter(a => String(a.imei || "").trim() === imeiCli).length;
+  }
+
+  function getClienteSelecionado() {
+    if (!clienteSelecionadoId) return null;
+    return clientes.find(c => c.id === clienteSelecionadoId) || null;
+  }
+
+  // Resumo do cliente (card superior)
+  function renderResumoCliente() {
+    const cli = getClienteSelecionado();
+    if (!cli) {
+      elCardResumoVazio.style.display = "block";
+      elCardResumo.style.display = "none";
+      return;
+    }
+
+    const qtdEquip = contarEquipamentosCliente(cli);
+
+    elCardResumoVazio.style.display = "none";
+    elCardResumo.style.display = "block";
+
+    elResNome.textContent = cli.nome_proprietario || "—";
+    elResEmbarcacao.textContent = cli.nome_embarcacao
+      ? `Embarcação: ${cli.nome_embarcacao}`
+      : "Embarcação não informada";
+
+    elResTelefone.textContent = cli.telefone || cli.whatsapp || "—";
+    elResEmail.textContent    = cli.email || "—";
+    elResPorto.textContent    = cli.porto || cli.porto_local || "—";
+    elResObs.textContent      = cli.observacoes || cli.obs || "—";
+
+    elResQtdEquip.textContent =
+      (qtdEquip === 1 ? "1 equipamento" : `${qtdEquip} equipamentos`);
+  }
+
+  // Tabela de equipamentos
+  function renderEquipamentos() {
+    const cli = getClienteSelecionado();
+    if (!cli) {
+      elEquipVazio.style.display = "block";
+      elEquipTabelaWrap.style.display = "none";
+      elHintEquip.textContent =
+        "Selecione um cliente para listar as embarcações monitoradas.";
+      return;
+    }
+
+    const imeiCli = String(cli.imei_motor || "").trim();
+
+    const lista = ativos.filter(a => {
+      if (!imeiCli) return false;
+      return String(a.imei || "").trim() === imeiCli;
+    });
+
+    if (!lista.length) {
+      elEquipVazio.style.display = "block";
+      elEquipTabelaWrap.style.display = "none";
+      elEquipVazio.innerHTML =
+        `Nenhum equipamento vinculado ao IMEI informado.<br/>
+         Verifique se o IMEI do cliente coincide com algum ativo cadastrado.`;
+      elHintEquip.textContent =
+        "Nenhum ativo com IMEI igual ao informado no cadastro do cliente.";
+      return;
+    }
+
+    elEquipVazio.style.display = "none";
+    elEquipTabelaWrap.style.display = "block";
+    elHintEquip.textContent =
+      "Clique em “Abrir painel” para ir direto para o monitoramento técnico.";
+
+    elTbodyEquip.innerHTML = "";
+    lista.forEach(a => {
+      const tr = document.createElement("tr");
+      const tipoLegivel =
+        a.tipo === "caminhao" ? "Caminhão" :
+        a.tipo === "lancha"   ? "Lancha"   :
+        (a.tipo || "—");
+
+      const medida =
+        a.medida_base === "km"   ? "Km" :
+        a.medida_base === "hora" ? "Horas" :
+        (a.medida_base || "—");
+
+      tr.innerHTML = `
+        <td>
+          <div class="equip-nome">${a.nome || "Sem nome"}</div>
+        </td>
+        <td>${tipoLegivel}</td>
+        <td>${a.imei || "—"}</td>
+        <td>${medida}</td>
+        <td class="right">
+          <button class="btn small" onclick="abrirPainelAtivo('${a.id}')">
+            Abrir painel
+          </button>
+        </td>
+      `;
+      elTbodyEquip.appendChild(tr);
+    });
+  }
+
+  // Seleciona o ativo no back-end e redireciona para o painel interno (/)
+  async function abrirPainelAtivo(ativoId) {
+    try {
+      const resp = await fetch(`/ativos/${ativoId}/selecionar`, {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({})
+      });
+      const data = await resp.json();
+      if (data.erro) {
+        alert("Erro ao selecionar ativo: " + data.erro);
+        return;
+      }
+      // redireciona para o painel interno já usando esse ativo
+      window.location.href = "/";
+    } catch (e) {
+      console.error("Erro ao abrir painel do ativo:", e);
+      alert("Não foi possível abrir o painel deste ativo agora.");
+    }
+  }
+
+  // Eventos
+  elBuscaCliente.addEventListener("input", () => {
+    renderListaClientes();
+  });
+
+  // Inicialização
+  carregarDados();
+</script>
+</body>
+</html>
