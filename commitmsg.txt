@@ -1,4 +1,4 @@
-﻿feat: adiciona persistência de clientes
-- cria clientes.json
-- adiciona rota POST /api/clientes
-- integra cadastro.html com backend
+﻿deploy: adicionar painel_geral (nova tela principal)
+- criar arquivo painel_geral.html
+- adicionar rota /painel-geral no server.py
+- manter dashboard.html e cadastro.html intactos
