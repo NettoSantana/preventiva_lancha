@@ -1,6 +1,5 @@
-﻿feat: horímetro cumulativo interno e ajuste de horas_totais
+﻿feat: exibir próximas atividades a partir do plano de preventiva no painel
 
-- cria horas_totais e horimetro_state no db.json
-- usa servertime + motor_ligado para acumular horas
-- evita zerar quando acctime da BrasilSat volta a 0
-- /config/horas_totais vira botão de ajuste do horímetro
+- troca card 'Próxima troca de óleo' por 'Próximas atividades'
+- consome endpoint /preventiva para montar a lista
+- remove cálculo fixo de ciclo de 100h

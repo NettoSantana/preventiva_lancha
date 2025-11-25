@@ -72,7 +72,6 @@
     .col-8{grid-column:span 8}
     .col-12{grid-column:span 12}
     @media(max-width:900px){.col-4,.col-5,.col-7,.col-8{grid-column:span 12}}
-    canvas{width:100% !important;}
     .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
     .table{width:100%;border-collapse:collapse;margin-top:6px;font-size:13px;}
     .table th,.table td{border-bottom:1px solid var(--line);padding:8px;text-align:left;}
@@ -80,7 +79,7 @@
     .right{text-align:right}
     input{
       width:100%; padding:8px; border-radius:8px; border:1px solid var(--line);
-      background:#0a1325; color:var(--ink); outline:none;
+      background:#0a1325; color:#e5e7eb; outline:none;
     }
     label{font-size:12px;color:var(--muted)}
     .hide{display:none !important;}
@@ -118,7 +117,7 @@
         <button class="btn" id="btnAjusteOffset">Ajuste</button>
       </div>
       <div class="kpi" id="horasMotor">--</div>
-      <div class="muted">Leitura base (BrasilSat + offset)</div>
+      <div class="muted">Hora real do motor (offset + horas totais)</div>
       <div class="muted" style="margin-top:4px">Offset atual: <span id="offsetAtual">0.0</span></div>
     </div>
 
@@ -126,7 +125,7 @@
     <div class="card col-4">
       <h2>Horas totais (cumulativa)</h2>
       <div class="kpi" id="horasTotais">--</div>
-      <div class="muted">BrasilSat + base manual (não zera)</div>
+      <div class="muted">Acumulado desde o início da manutenção</div>
     </div>
 
     <!-- Status motor -->
@@ -333,15 +332,26 @@
     document.getElementById("lastUpdate").textContent =
       `Última atualização: ${fmtTime(d.servertime)} (${new Date().toLocaleDateString("pt-BR")})`;
 
-    // === Hora da embarcação (uso_base)
-    const uso = Number(d.uso_base ?? d.horas_motor ?? 0);
     const unit = d.unidade_base || (d.medida_base==="km" ? "km" : "h");
-    document.getElementById("horasMotor").textContent = uso.toFixed(2) + " " + unit;
+
+    // === Hora da embarcação (offset + horas_totais)
+    let horaEmbarcacao;
+    if (d.medida_base === "hora") {
+      // backend já manda hora_embarcacao pronto; se não vier, calcula
+      const rawHora = (d.hora_embarcacao !== undefined && d.hora_embarcacao !== null)
+        ? d.hora_embarcacao
+        : (Number(d.horas_totais || 0) + Number(d.offset || 0));
+      horaEmbarcacao = Number(rawHora || 0);
+    } else {
+      // caso de KM: usa uso_base como "odômetro base" pra manter compatível
+      horaEmbarcacao = Number(d.uso_base ?? d.km_total ?? 0);
+    }
+    document.getElementById("horasMotor").textContent = horaEmbarcacao.toFixed(2) + " " + unit;
 
     // Offset atual
     document.getElementById("offsetAtual").textContent = Number(d.offset || 0).toFixed(2);
 
-    // === Totais cumulativos
+    // === Totais cumulativos (sem offset)
     let total = null;
     if (d.medida_base === "km") total = d.km_totais;
     else total = d.horas_totais;
@@ -368,7 +378,6 @@
     if (!tarefas.length) {
       elProx.textContent = "Nenhuma atividade pendente cadastrada.";
     } else {
-      // mostra as 3 primeiras, já vêm ordenadas pela API
       const linhas = tarefas.slice(0, 3).map(t => {
         const faltam = (typeof t.faltam === "number") ? t.faltam.toFixed(1) : t.faltam;
         const status = t.status || "";
@@ -378,13 +387,13 @@
       elProx.innerHTML = linhas.join("<br>");
     }
 
-    // ALERTAS (mantidos para bateria / carga)
+    // ALERTAS (bateria / carga)
     const alerts = [];
     if (v < 12.0) alerts.push("Tensão baixa: agendar carga/teste de bateria.");
     if (ligado && v < 13.2) alerts.push("Motor ligado sem tensão de carga adequada.");
     setAlertas(alerts);
 
-    // registra no histórico de leituras (para a tabela)
+    // histórico de leituras (tabela)
     if (!isNaN(v) && d.servertime) pushPoint(v, d.servertime);
   }
 
