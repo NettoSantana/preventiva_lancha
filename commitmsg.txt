@@ -1,4 +1,6 @@
-﻿feat: add Cliente button and cadastro route
+﻿fix: reduzir chamadas à BrasilSat com cache de token e track
 
-- create /cadastro route in server.py serving cadastro.html
-- add 'Cliente' button in dashboard header linking to /cadastro
+- adiciona cache de token (authorization) com validade de ~50min
+- adiciona cache de track por IMEI com TTL de 20s
+- evita erro "Over TPS Limit" na rota /dados e /preventiva
+- mantém todas as rotas e regras de horímetro/preventiva intactas
