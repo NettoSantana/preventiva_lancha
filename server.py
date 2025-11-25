@@ -1,533 +1,933 @@
-<!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8" />
-  <title>Painel Interno — Preventiva Náutica</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <!-- REMOVIDO Chart.js, não temos mais gráfico -->
-  <style>
-    :root{
-      --bg:#0b1020; --bg2:#0f172a; --card:#121a2e; --card2:#0f172b;
-      --ink:#e5e7eb; --muted:#94a3b8; --accent:#38bdf8;
-      --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --line:#1f2a44;
-      --radius:16px;
-    }
-    *{box-sizing:border-box}
-    body{
-      margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      background: radial-gradient(1200px 700px at 20% -10%, #12214a 0%, transparent 70%),
-                  radial-gradient(1400px 800px at 120% 10%, #0b3a55 0%, transparent 60%),
-                  linear-gradient(180deg,var(--bg),var(--bg2));
-      color:var(--ink);
-    }
-    .wrap{max-width:1200px;margin:28px auto;padding:0 16px}
-    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px;flex-wrap:wrap}
-    .title{display:flex;gap:12px;align-items:center}
+from flask import Flask, jsonify, send_from_directory, request
+import time
+import hashlib
+import requests
+import os
+import math
+import json
+import uuid
 
-    /* LOGO COMO IMAGEM */
-    .logo{
-      width:56px;
-      height:56px;
-      border-radius:12px;
-      object-fit:cover;
-      display:block;
-      box-shadow:0 10px 30px rgba(56,189,248,.25);
-    }
+app = Flask(__name__)
 
-    h1{margin:0;font-size:22px;letter-spacing:.3px}
-    .sub{color:var(--muted);font-size:13px;margin-top:2px}
-    .pill{
-      padding:6px 10px;border-radius:999px;font-size:12px;
-      background:#0a1325;border:1px solid var(--line);color:var(--muted);
-    }
-    .btn{
-      padding:8px 12px;border-radius:10px;border:1px solid var(--line);
-      background:#0a1325;color:var(--ink);cursor:pointer;font-size:13px;
-    }
-    .btn.active{border-color:rgba(56,189,248,.5); color:var(--accent)}
-    .grid{display:grid;gap:14px;grid-template-columns:repeat(12,1fr);}
-    .card{
-      background:linear-gradient(180deg,var(--card),var(--card2));
-      border:1px solid var(--line);
-      border-radius:var(--radius); padding:16px;
-      box-shadow:0 6px 18px rgba(0,0,0,.35);
-    }
-    .card h2{
-      margin:0 0 8px;font-size:14px;font-weight:700;color:var(--accent);
-      letter-spacing:.4px;text-transform:uppercase;
-    }
-    .kpi{font-size:30px;font-weight:800;margin:6px 0}
-    .muted{color:var(--muted);font-size:13px}
-    .status{display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px}
-    .dot{width:10px;height:10px;border-radius:999px;background:var(--muted);box-shadow:0 0 0 4px rgba(148,163,184,.12);}
-    .dot.ok{background:var(--ok);box-shadow:0 0 0 4px rgba(34,197,94,.12)}
-    .dot.warn{background:var(--warn);box-shadow:0 0 0 4px rgba(245,158,11,.12)}
-    .dot.bad{background:var(--bad);box-shadow:0 0 0 4px rgba(239,68,68,.12)}
-    .badge{
-      display:inline-flex;align-items:center;gap:6px;
-      padding:4px 8px;border-radius:10px;border:1px solid var(--line);
-      font-size:12px;color:var(--muted);
-    }
-    .badge.ok{color:var(--ok);border-color:rgba(34,197,94,.35)}
-    .badge.warn{color:var(--warn);border-color:rgba(245,158,11,.35)}
-    .badge.bad{color:var(--bad);border-color:rgba(239,68,68,.35)}
-    .col-4{grid-column:span 4}
-    .col-5{grid-column:span 5}
-    .col-7{grid-column:span 7}
-    .col-8{grid-column:span 8}
-    .col-12{grid-column:span 12}
-    @media(max-width:900px){.col-4,.col-5,.col-7,.col-8{grid-column:span 12}}
-    .row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-    .table{width:100%;border-collapse:collapse;margin-top:6px;font-size:13px;}
-    .table th,.table td{border-bottom:1px solid var(--line);padding:8px;text-align:left;}
-    .table th{color:var(--muted);font-weight:600}
-    .right{text-align:right}
-    input{
-      width:100%; padding:8px; border-radius:8px; border:1px solid var(--line);
-      background:#0a1325; color:#e5e7eb; outline:none;
-    }
-    label{font-size:12px;color:var(--muted)}
-    .hide{display:none !important;}
-  </style>
-</head>
+# =========================
+#  BRASILSAT (API)
+# =========================
+BASE_URL = "https://gps.brasilsatgps.com.br"
+ACCOUNT = os.getenv("BRASILSAT_ACCOUNT", "nettosantana@icloud.com")
+PASSWORD = os.getenv("BRASILSAT_PASSWORD", "1234567")
 
-<body>
-<div class="wrap">
+# --- CACHE DE TOKEN (evitar /authorization toda hora) ---
+TOKEN_CACHE = {
+    "token": None,
+    "expires_at": 0,  # epoch em segundos
+}
 
-  <header>
-    <div class="title">
-      <!-- LOGO COMO IMAGEM -->
-      <img src="logo.jpeg" alt="Preventiva Náutica" class="logo">
-      <div>
-        <h1>Painel Interno — Preventiva Náutica</h1>
-        <div class="sub">BrasilSat → API → Flask → Dashboard (uso interno)</div>
-      </div>
-    </div>
+# --- CACHE DE TRACK POR IMEI (evitar bater na BrasilSat toda hora) ---
+BRASILSAT_CACHE = {}
+BRASILSAT_TTL = 20  # segundos (atualização a cada 20s)
 
-    <div class="row">
-      <button class="btn active" id="tabPainel">Painel</button>
-      <button class="btn" id="tabPreventiva">Preventiva</button>
-      <!-- BOTÃO CLIENTE -->
-      <button class="btn" id="btnCliente">Cliente</button>
-      <!-- NOVO BOTÃO: PAINEL GERAL -->
-      <button class="btn" id="btnPainelGeral">Painel geral</button>
-      <div class="pill" id="lastUpdate">Última atualização: --</div>
-      <div class="pill">IMEI: <span id="imei">--</span></div>
-    </div>
-  </header>
 
-  <!-- =======================
-       PAINEL PRINCIPAL
-  ======================== -->
-  <section id="viewPainel" class="grid">
-    <!-- Hora da embarcação -->
-    <div class="card col-4">
-      <div class="row">
-        <h2>Hora da embarcação</h2>
-        <button class="btn" id="btnAjusteOffset">Ajuste</button>
-      </div>
-      <div class="kpi" id="horasMotor">--</div>
-      <div class="muted">Hora real do motor (offset + horas totais)</div>
-      <div class="muted" style="margin-top:4px">Offset atual: <span id="offsetAtual">0.0</span></div>
-    </div>
+def md5(s: str) -> str:
+    return hashlib.md5(s.encode("utf-8")).hexdigest()
 
-    <!-- Horas totais cumulativas -->
-    <div class="card col-4">
-      <h2>Horas totais (cumulativa)</h2>
-      <div class="kpi" id="horasTotais">--</div>
-      <div class="muted">Acumulado desde o início da manutenção</div>
-    </div>
 
-    <!-- Status motor -->
-    <div class="card col-4">
-      <h2>Status do Motor</h2>
-      <div class="kpi" id="motorStatus">--</div>
-      <div class="status">
-        <div class="dot" id="motorDot"></div>
-        <div class="muted" id="motorHint">--</div>
-      </div>
-    </div>
+def get_token():
+    """
+    Obtém token da BrasilSat com cache.
+    Só chama /api/authorization quando o token expirar.
+    """
+    now = int(time.time())
 
-    <!-- Tensão -->
-    <div class="card col-4">
-      <h2>Tensão da Bateria</h2>
-      <div class="kpi" id="tensao">-- V</div>
-      <div class="badge" id="tensaoBadge">--</div>
-      <div class="muted" style="margin-top:6px">
-        &lt;12.0V baixa | 12.0–12.5V ok parado | &gt;13.2V carregando
-      </div>
-    </div>
+    # Se ainda está válido, reaproveita
+    if TOKEN_CACHE["token"] and now < TOKEN_CACHE["expires_at"]:
+        return TOKEN_CACHE["token"]
 
-    <!-- Horas paradas (não cumulativa, zera ao ligar) -->
-    <div class="card col-4">
-      <h2>Horas paradas</h2>
-      <div class="kpi" id="horasParadas">--</div>
-      <div class="muted">Tempo contínuo com motor desligado (zera ao ligar)</div>
-    </div>
+    signature = md5(md5(PASSWORD) + str(now))
+    url = f"{BASE_URL}/api/authorization"
+    r = requests.get(
+        url,
+        params={"time": now, "account": ACCOUNT, "signature": signature},
+        timeout=15,
+    )
+    r.raise_for_status()
+    j = r.json()
+    if j.get("code") != 0:
+        raise RuntimeError(f"Auth falhou: {j}")
 
-    <!-- PRÓXIMAS ATIVIDADES (via /preventiva) -->
-    <div class="card col-4">
-      <h2>Próximas atividades</h2>
-      <div class="muted" id="proxAtividades">Carregando...</div>
-    </div>
+    token = j["record"]["access_token"]
 
-    <!-- Alertas -->
-    <div class="card col-4">
-      <h2>Alertas</h2>
-      <div id="alertas" class="muted">--</div>
-    </div>
+    # Chuto validade de 50 minutos pra não ficar sem renovar
+    TOKEN_CACHE["token"] = token
+    TOKEN_CACHE["expires_at"] = now + 50 * 60
 
-    <!-- Leituras recentes -->
-    <div class="card col-4">
-      <div class="row">
-        <h2 style="margin:0">Leituras recentes</h2>
-        <button id="clearHistory" class="pill" style="cursor:pointer;border:none">limpar histórico</button>
-      </div>
-      <table class="table" id="logs">
-        <thead><tr><th>Hora</th><th class="right">V</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </section>
+    return token
 
-  <!-- =======================
-       VIEW PREVENTIVA (CONFIG)
-  ======================== -->
-  <section id="viewPreventiva" class="grid hide">
-    <div class="card col-12">
-      <div class="row">
-        <h2 style="margin:0">Plano de Preventiva (por horas/km)</h2>
-        <button class="btn" id="btnSalvarPlano">Salvar plano</button>
-      </div>
-      <div class="muted">Cadastre as tarefas conforme o manual do motor.</div>
-    </div>
 
-    <div class="card col-12">
-      <div class="row" style="gap:14px; align-items:flex-end;">
-        <div style="flex:2; min-width:220px">
-          <label>Nome da tarefa</label>
-          <input id="inpNome" placeholder="Ex.: Troca de óleo do motor"/>
-        </div>
-        <div style="flex:1; min-width:140px">
-          <label>Primeira execução</label>
-          <input id="inpPrimeira" type="number" step="0.1" placeholder="100"/>
-        </div>
-        <div style="flex:1; min-width:140px">
-          <label>Intervalo</label>
-          <input id="inpIntervalo" type="number" step="0.1" placeholder="100"/>
-        </div>
-        <div style="flex:1; min-width:140px">
-          <label>Avisar antes</label>
-          <input id="inpAvisar" type="number" step="0.1" placeholder="10"/>
-        </div>
-        <div>
-          <button class="btn" id="btnAdicionar">Adicionar</button>
-        </div>
-      </div>
-    </div>
+def track(access_token: str, imei: str):
+    url = f"{BASE_URL}/api/track"
+    r = requests.get(
+        url, params={"access_token": access_token, "imeis": imei}, timeout=15
+    )
+    r.raise_for_status()
+    j = r.json()
+    if j.get("code") != 0:
+        raise RuntimeError(f"Track falhou: {j}")
+    return j["record"][0]
 
-    <div class="card col-12">
-      <h2>Itens cadastrados</h2>
-      <table class="table" id="tblPlano">
-        <thead>
-          <tr>
-            <th>Tarefa</th>
-            <th class="right">1ª Exec</th>
-            <th class="right">Intervalo</th>
-            <th class="right">Avisar</th>
-            <th class="right">Ações</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-      <div class="muted" id="planoMsg" style="margin-top:8px"></div>
-    </div>
-  </section>
 
-</div>
+# =========================
+#  "DB" SIMPLES EM JSON (ATIVOS)
+# =========================
+DB_FILE = os.path.join(os.path.dirname(__file__), "db.json")
 
-<script>
-  const ENDPOINT_DADOS = "/dados";
-  const ENDPOINT_PLANO = "/config/plano";
-  const ENDPOINT_OFFSET = "/config/offset";
-  const ENDPOINT_PREVENTIVA = "/preventiva";
-  const MAX_POINTS = 60;
+# "DB" de clientes em arquivo separado
+CLIENTES_FILE = os.path.join(os.path.dirname(__file__), "clientes.json")
 
-  // ===========================
-  // NAVEGAÇÃO (Painel / Preventiva)
-  // ===========================
-  const tabPainel = document.getElementById("tabPainel");
-  const tabPreventiva = document.getElementById("tabPreventiva");
-  const viewPainel = document.getElementById("viewPainel");
-  const viewPreventiva = document.getElementById("viewPreventiva");
+DEFAULT_PLANO_HORAS = [
+    {
+        "nome": "Troca de óleo do motor",
+        "unidade": "hora",
+        "primeira_execucao": 100,
+        "intervalo": 100,
+        "avisar_antes": 10,
+    },
+    {
+        "nome": "Troca do filtro de óleo",
+        "unidade": "hora",
+        "primeira_execucao": 100,
+        "intervalo": 100,
+        "avisar_antes": 10,
+    },
+    {
+        "nome": "Drenar separador de água/combustível",
+        "unidade": "hora",
+        "primeira_execucao": 100,
+        "intervalo": 100,
+        "avisar_antes": 10,
+    },
+    {
+        "nome": "Troca do filtro de combustível",
+        "unidade": "hora",
+        "primeira_execucao": 200,
+        "intervalo": 200,
+        "avisar_antes": 10,
+    },
+]
 
-  function showPainel(){
-    tabPainel.classList.add("active");
-    tabPreventiva.classList.remove("active");
-    viewPainel.classList.remove("hide");
-    viewPreventiva.classList.add("hide");
-  }
-  function showPreventiva(){
-    tabPreventiva.classList.add("active");
-    tabPainel.classList.remove("active");
-    viewPreventiva.classList.remove("hide");
-    viewPainel.classList.add("hide");
-    carregarPlano();
-  }
-  tabPainel.onclick = showPainel;
-  tabPreventiva.onclick = showPreventiva;
+DEFAULT_PLANO_KM = [
+    {
+        "nome": "Troca de óleo do motor",
+        "unidade": "km",
+        "primeira_execucao": 10000,
+        "intervalo": 10000,
+        "avisar_antes": 500,
+    },
+    {
+        "nome": "Troca do filtro de óleo",
+        "unidade": "km",
+        "primeira_execucao": 10000,
+        "intervalo": 10000,
+        "avisar_antes": 500,
+    },
+    {
+        "nome": "Troca do filtro de combustível",
+        "unidade": "km",
+        "primeira_execucao": 20000,
+        "intervalo": 20000,
+        "avisar_antes": 1000,
+    },
+]
 
-  // BOTÃO CLIENTE → /cadastro
-  const btnCliente = document.getElementById("btnCliente");
-  if (btnCliente){
-    btnCliente.onclick = () => {
-      window.location.href = "/cadastro";
-    };
-  }
+# ===== ATIVO DEFAULT (bootstrap) =====
+BOOTSTRAP_IMEI = os.getenv("BRASILSAT_IMEI", "355468593059041")
+BOOTSTRAP_NOME = os.getenv(
+    "BOOTSTRAP_NOME", "Electro Auto Náutica — Embarcação 01"
+)
+BOOTSTRAP_TIPO = os.getenv("BOOTSTRAP_TIPO", "lancha")  # lancha | caminhao
+BOOTSTRAP_MEDIDA = os.getenv("BOOTSTRAP_MEDIDA", "hora")  # hora | km
 
-  // NOVO: BOTÃO PAINEL GERAL → /painel_geral
-  const btnPainelGeral = document.getElementById("btnPainelGeral");
-  if (btnPainelGeral){
-    btnPainelGeral.onclick = () => {
-      window.location.href = "/painel_geral";
-    };
-  }
 
-  // ===========================
-  // HISTÓRICO TENSÃO LOCAL (só para tabela, sem gráfico)
-  // ===========================
-  const storeKey = "preventiva_hist_tensao_v1";
-  let hist = JSON.parse(localStorage.getItem(storeKey) || "[]");
-  function saveHist(){ localStorage.setItem(storeKey, JSON.stringify(hist)); }
-  function fmtTime(ts){
-    try{ return new Date(ts*1000).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",second:"2-digit"}); }
-    catch(e){ return "--"; }
-  }
-  function tensaoClass(v, motorLigado){
-    if (v < 12.0) return "bad";
-    if (motorLigado && v < 13.2) return "warn";
-    if (!motorLigado && v < 12.3) return "warn";
-    return "ok";
-  }
-  function tensaoLabel(v, motorLigado){
-    if (v < 12.0) return "Bateria baixa";
-    if (motorLigado && v < 13.2) return "Não carregando bem";
-    if (!motorLigado && v < 12.3) return "Meia carga";
-    return "Normal";
-  }
+def load_db():
+    if not os.path.exists(DB_FILE):
+        return {"ativos": [], "ativo_atual_id": None}
+    try:
+        with open(DB_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"ativos": [], "ativo_atual_id": None}
 
-  function renderLogs(){
-    const tbody = document.querySelector("#logs tbody");
-    tbody.innerHTML = "";
-    hist.slice(-10).reverse().forEach(p=>{
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${p.t}</td><td class="right">${p.v.toFixed(2)}</td>`;
-      tbody.appendChild(tr);
-    });
-  }
 
-  function pushPoint(v, servertime){
-    hist.push({t:fmtTime(servertime), v, servertime});
-    if (hist.length > MAX_POINTS) hist = hist.slice(-MAX_POINTS);
-    saveHist();
-    renderLogs();
-  }
+def save_db(db):
+    with open(DB_FILE, "w", encoding="utf-8") as f:
+        json.dump(db, f, ensure_ascii=False, indent=2)
 
-  document.getElementById("clearHistory").onclick = ()=>{
-    hist=[]; saveHist();
-    renderLogs();
-  };
 
-  function setAlertas(arr){
-    const el = document.getElementById("alertas");
-    el.innerHTML = arr.length ? arr.map(a=>`• ${a}`).join("<br>") : "Sem alertas no momento.";
-  }
+def load_clientes():
+    if not os.path.exists(CLIENTES_FILE):
+        return {"clientes": []}
+    try:
+        with open(CLIENTES_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"clientes": []}
 
-  async function refreshPainel(){
-    // DADOS GERAIS
-    const r = await fetch(ENDPOINT_DADOS, {cache:"no-store"});
-    const d = await r.json();
 
-    // PREVENTIVA (próximas atividades)
-    let tarefas = [];
-    let unidadePreventiva = "";
-    try {
-      const rPrev = await fetch(ENDPOINT_PREVENTIVA, {cache:"no-store"});
-      const p = await rPrev.json();
-      tarefas = Array.isArray(p.tarefas) ? p.tarefas : [];
-      unidadePreventiva = p.unidade || "";
-    } catch(e){
-      tarefas = [];
-      unidadePreventiva = "";
+def save_clientes(data):
+    with open(CLIENTES_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+db = load_db()
+clientes_db = load_clientes()
+
+
+def ensure_defaults_for_ativo(ativo):
+    # plano preventivo default
+    if "plano_preventivo" not in ativo or not isinstance(
+        ativo.get("plano_preventivo"), list
+    ):
+        ativo["plano_preventivo"] = (
+            DEFAULT_PLANO_HORAS
+            if ativo.get("medida_base") == "hora"
+            else DEFAULT_PLANO_KM
+        )
+
+    # base cumulativa antiga (km) – mantida para compatibilidade
+    ativo.setdefault("horas_base_total", 0.0)
+    ativo.setdefault("km_base_total", 0.0)
+
+    # estado de horas paradas
+    ativo.setdefault(
+        "paradas_state", {"last_ts": 0, "last_motor": False, "acc_s": 0}
+    )
+
+    # NOVO: horímetro cumulativo interno
+    ativo.setdefault("horas_totais", 0.0)
+    ativo.setdefault(
+        "horimetro_state", {"last_ts": 0, "last_motor": False}
+    )
+
+
+def bootstrap_db_if_needed():
+    """Se subir com db.json vazio, cria um ativo default automaticamente."""
+    ativos = db.get("ativos", [])
+    if ativos:
+        for a in ativos:
+            ensure_defaults_for_ativo(a)
+        if not db.get("ativo_atual_id") and ativos:
+            db["ativo_atual_id"] = ativos[0]["id"]
+        save_db(db)
+        return
+
+    medida = (BOOTSTRAP_MEDIDA or "").lower()
+    tipo = (BOOTSTRAP_TIPO or "").lower()
+
+    if tipo not in ("lancha", "caminhao"):
+        tipo = "lancha"
+    if medida not in ("hora", "km"):
+        medida = "hora" if tipo == "lancha" else "km"
+
+    ativo = {
+        "id": uuid.uuid4().hex[:8],
+        "nome": BOOTSTRAP_NOME,
+        "tipo": tipo,
+        "imei": BOOTSTRAP_IMEI,
+        "medida_base": medida,
+        "offset": 0.0,
+        "plano_preventivo": (
+            DEFAULT_PLANO_HORAS if medida == "hora" else DEFAULT_PLANO_KM
+        ),
+        "horas_base_total": 0.0,
+        "km_base_total": 0.0,
+        "paradas_state": {"last_ts": 0, "last_motor": False, "acc_s": 0},
+        "horas_totais": 0.0,
+        "horimetro_state": {"last_ts": 0, "last_motor": False},
     }
 
-    document.getElementById("imei").textContent = d.imei || "--";
-    document.getElementById("lastUpdate").textContent =
-      `Última atualização: ${fmtTime(d.servertime)} (${new Date().toLocaleDateString("pt-BR")})`;
+    db["ativos"] = [ativo]
+    db["ativo_atual_id"] = ativo["id"]
+    save_db(db)
 
-    const unit = d.unidade_base || (d.medida_base==="km" ? "km" : "h");
 
-    // === Hora da embarcação (offset + horas_totais)
-    let horaEmbarcacao;
-    if (d.medida_base === "hora") {
-      const rawHora = (d.hora_embarcacao !== undefined && d.hora_embarcacao !== null)
-        ? d.hora_embarcacao
-        : (Number(d.horas_totais || 0) + Number(d.offset || 0));
-      horaEmbarcacao = Number(rawHora || 0);
-    } else {
-      horaEmbarcacao = Number(d.uso_base ?? d.km_total ?? 0);
-    }
-    document.getElementById("horasMotor").textContent = horaEmbarcacao.toFixed(2) + " " + unit;
+bootstrap_db_if_needed()
 
-    // Offset atual
-    document.getElementById("offsetAtual").textContent = Number(d.offset || 0).toFixed(2);
 
-    // === Totais cumulativos (sem offset)
-    let total = null;
-    if (d.medida_base === "km") total = d.km_totais;
-    else total = d.horas_totais;
+def get_ativo_atual():
+    ativos = db.get("ativos", [])
+    if not ativos:
+        return None
 
-    document.getElementById("horasTotais").textContent =
-      (total !== null && total !== undefined) ? (Number(total).toFixed(2) + " " + unit) : "--";
+    ativo_id = db.get("ativo_atual_id")
+    if ativo_id:
+        for a in ativos:
+            if a["id"] == ativo_id:
+                return a
 
-    // Motor
-    const ligado = !!d.motor_ligado;
-    document.getElementById("motorStatus").textContent = ligado ? "LIGADO" : "DESLIGADO";
-    document.getElementById("motorDot").className = "dot " + (ligado ? "ok" : "");
-    document.getElementById("motorHint").textContent = ligado ? "Ignição ON" : "Ignição OFF";
+    db["ativo_atual_id"] = ativos[0]["id"]
+    save_db(db)
+    return ativos[0]
 
-    // Tensão
-    const v = Number(d.tensao_bateria || 0);
-    document.getElementById("tensao").textContent = v.toFixed(2) + " V";
-    const cls = tensaoClass(v, ligado);
-    const badge = document.getElementById("tensaoBadge");
-    badge.className = "badge " + cls;
-    badge.textContent = tensaoLabel(v, ligado);
 
-    // Horas paradas (não cumulativa)
-    const hp = Number(d.horas_paradas ?? 0);
-    document.getElementById("horasParadas").textContent = hp.toFixed(2) + " h";
+# =========================
+#  LÓGICA DE PREVENTIVA
+# =========================
+def calcular_status_preventiva(uso_ajustado: float, plano: list):
+    tarefas = []
+    for item in plano:
+        unidade = item.get("unidade", "hora")
+        primeira = float(item.get("primeira_execucao", 0))
+        intervalo = float(item.get("intervalo", 0))
+        avisar_antes = float(item.get("avisar_antes", 10))
 
-    // PRÓXIMAS ATIVIDADES (a partir da preventiva)
-    const elProx = document.getElementById("proxAtividades");
-    if (!tarefas.length) {
-      elProx.textContent = "Nenhuma atividade pendente cadastrada.";
-    } else {
-      const linhas = tarefas.slice(0, 3).map(t => {
-        const faltam = (typeof t.faltam === "number") ? t.faltam.toFixed(1) : t.faltam;
-        const status = t.status || "";
-        const unidade = unidadePreventiva || t.unidade || unit || "";
-        return `• ${t.nome} em ${faltam} ${unidade} (${status})`;
-      });
-      elProx.innerHTML = linhas.join("<br>");
-    }
+        if intervalo <= 0 or primeira <= 0:
+            continue
 
-    // ALERTAS (bateria / carga)
-    const alerts = [];
-    if (v < 12.0) alerts.push("Tensão baixa: agendar carga/teste de bateria.");
-    if (ligado && v < 13.2) alerts.push("Motor ligado sem tensão de carga adequada.");
-    setAlertas(alerts);
+        if uso_ajustado < primeira:
+            proxima = primeira
+        else:
+            ciclos = math.floor((uso_ajustado - primeira) / intervalo)
+            proxima = primeira + (ciclos + 1) * intervalo
 
-    // histórico de leituras (tabela)
-    if (!isNaN(v) && d.servertime) pushPoint(v, d.servertime);
-  }
+        faltam = round(proxima - uso_ajustado, 2)
 
-  // Botão AJUSTE (offset)
-  document.getElementById("btnAjusteOffset").onclick = async ()=>{
-    const atual = document.getElementById("offsetAtual").textContent || "0";
-    const novo = prompt("Digite o novo offset (h ou km):", atual);
-    if (novo === null) return;
-    const val = Number(novo);
-    if (isNaN(val)) { alert("offset inválido"); return; }
+        if faltam <= 0:
+            status = "ATRASADO"
+        elif faltam <= avisar_antes:
+            status = "ATENCAO"
+        else:
+            status = "OK"
 
-    const r = await fetch(ENDPOINT_OFFSET, {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({offset: val})
-    });
-    const d = await r.json();
-    if (d.erro) alert(d.erro);
-    refreshPainel();
-  };
+        tarefas.append(
+            {
+                "nome": item.get("nome", ""),
+                "unidade": unidade,
+                "primeira_execucao": primeira,
+                "intervalo": intervalo,
+                "avisar_antes": avisar_antes,
+                "proxima_execucao": round(proxima, 2),
+                "faltam": faltam,
+                "status": status,
+            }
+        )
 
-  // 👉 Atualização a cada 20 segundos
-  refreshPainel();
-  setInterval(()=>{ if(!viewPainel.classList.contains("hide")) refreshPainel(); }, 20000);
+    prioridade = {"ATRASADO": 0, "ATENCAO": 1, "OK": 2}
+    tarefas.sort(key=lambda x: (prioridade[x["status"]], x["faltam"]))
+    return tarefas
 
-  // ===========================
-  // PREVENTIVA — CRUD SIMPLES
-  // ===========================
-  let planoLocal = [];
 
-  function renderPlano(){
-    const tbody = document.querySelector("#tblPlano tbody");
-    tbody.innerHTML = "";
-    planoLocal.forEach((it, idx)=>{
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${it.nome}</td>
-        <td class="right">${Number(it.primeira_execucao).toFixed(1)}</td>
-        <td class="right">${Number(it.intervalo).toFixed(1)}</td>
-        <td class="right">${Number(it.avisar_antes || 10).toFixed(1)}</td>
-        <td class="right"><button class="btn" data-del="${idx}">Excluir</button></td>
-      `;
-      tbody.appendChild(tr);
-    });
+def obter_dados_brasilsat_por_imei(imei: str):
+    """
+    Busca dados da BrasilSat, com cache de 20s por IMEI.
+    Isso reduz chamadas e evita Over TPS Limit.
+    """
+    now = time.time()
+    cached = BRASILSAT_CACHE.get(imei)
+    if cached and (now - cached["last_fetch"] < BRASILSAT_TTL):
+        return cached["data"]
 
-    tbody.querySelectorAll("button[data-del]").forEach(btn=>{
-      btn.onclick = () => {
-        const i = Number(btn.getAttribute("data-del"));
-        planoLocal.splice(i,1);
-        renderPlano();
-      };
-    });
-  }
+    # Busca "real" na BrasilSat
+    token = get_token()
+    data = track(token, imei)
 
-  async function carregarPlano(){
-    const r = await fetch(ENDPOINT_PLANO, {cache:"no-store"});
-    const d = await r.json();
-    planoLocal = d.plano || [];
-    renderPlano();
-    document.getElementById("planoMsg").textContent = "";
-  }
+    acctime_s = int(data.get("acctime") or 0)
+    horas_reais = round(acctime_s / 3600.0, 2)
 
-  document.getElementById("btnAdicionar").onclick = ()=>{
-    const nome = document.getElementById("inpNome").value.trim();
-    const primeira = Number(document.getElementById("inpPrimeira").value);
-    const intervalo = Number(document.getElementById("inpIntervalo").value);
-    const avisar = Number(document.getElementById("inpAvisar").value || 10);
+    mileage_m = float(data.get("mileage") or 0)
+    km_total = round(mileage_m / 1000.0, 2)
 
-    if(!nome || !primeira || !intervalo){
-      document.getElementById("planoMsg").textContent = "Preencha nome, primeira execução e intervalo.";
-      return;
+    result = {
+        "imei": data.get("imei"),
+        "motor_ligado": bool(int(data.get("accstatus") or 0)),
+        "horas_reais": horas_reais,      # tempo do ciclo atual (BrasilSat)
+        "km_reais": km_total,
+        "tensao_bateria": float(data.get("externalpower") or 0),
+        "servertime": int(data.get("servertime") or time.time()),
     }
 
-    planoLocal.push({
-      nome,
-      primeira_execucao: primeira,
-      intervalo: intervalo,
-      avisar_antes: avisar
-    });
+    BRASILSAT_CACHE[imei] = {
+        "last_fetch": now,
+        "data": result,
+    }
+    return result
 
-    document.getElementById("inpNome").value = "";
-    document.getElementById("inpPrimeira").value = "";
-    document.getElementById("inpIntervalo").value = "";
-    document.getElementById("inpAvisar").value = "";
 
-    renderPlano();
-    document.getElementById("planoMsg").textContent = "";
-  };
+# =========================
+#  HORAS PARADAS (zera ao ligar)
+# =========================
+def atualizar_horas_paradas(ativo, servertime: int, motor_ligado: bool):
+    st = ativo.get("paradas_state") or {}
+    last_ts = int(st.get("last_ts") or 0)
+    last_motor = bool(st.get("last_motor") or False)
+    acc_s = int(st.get("acc_s") or 0)
 
-  document.getElementById("btnSalvarPlano").onclick = async ()=>{
-    const r = await fetch(ENDPOINT_PLANO, {
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({plano: planoLocal})
-    });
-    const d = await r.json();
-    document.getElementById("planoMsg").textContent =
-      d.mensagem ? `✅ ${d.mensagem} (itens: ${d.total_itens})` : `⚠️ ${d.erro || "erro ao salvar"}`;
-  };
-</script>
-</body>
-</html>
+    if last_ts == 0:
+        last_ts = servertime
+        last_motor = motor_ligado
+        acc_s = 0
+
+    if (not last_motor) and (not motor_ligado):
+        delta = max(0, servertime - last_ts)
+        acc_s += delta
+
+    if (not last_motor) and motor_ligado:
+        # ligou o motor -> zera horas paradas
+        acc_s = 0
+
+    st["last_ts"] = servertime
+    st["last_motor"] = motor_ligado
+    st["acc_s"] = acc_s
+    ativo["paradas_state"] = st
+
+    return round(acc_s / 3600.0, 2)
+
+
+# =========================
+#  HORÍMETRO CUMULATIVO
+# =========================
+def atualizar_horas_totais(ativo, servertime: int, motor_ligado: bool):
+    """
+    Acumula horas de motor ligado usando servertime.
+    Não depende do acctime (que zera a cada ciclo).
+    """
+    st = ativo.get("horimetro_state") or {}
+    last_ts = int(st.get("last_ts") or 0)
+    last_motor = bool(st.get("last_motor") or False)
+    total = float(ativo.get("horas_totais") or 0.0)
+
+    if last_ts == 0:
+        # primeira leitura, só inicializa
+        st["last_ts"] = servertime
+        st["last_motor"] = motor_ligado
+        ativo["horimetro_state"] = st
+        ativo["horas_totais"] = total
+        return round(total, 2)
+
+    delta = max(0, servertime - last_ts)
+    if last_motor:
+        # estava ligado nesse intervalo => soma ao horímetro
+        total += delta / 3600.0
+
+    st["last_ts"] = servertime
+    st["last_motor"] = motor_ligado
+    ativo["horimetro_state"] = st
+    ativo["horas_totais"] = total
+
+    return round(total, 2)
+
+
+# =========================
+#  ROTAS BÁSICAS
+# =========================
+@app.get("/")
+def dashboard():
+    return send_from_directory(".", "dashboard.html")
+
+
+# NOVA ROTA: tela de cadastro de cliente
+@app.get("/cadastro")
+def cadastro():
+    # cadastro.html precisa estar na mesma pasta de server.py
+    return send_from_directory(".", "cadastro.html")
+
+
+# NOVA ROTA: painel geral (visão por cliente)
+@app.get("/painel_geral")
+def painel_geral():
+    return send_from_directory(".", "painel_geral.html")
+
+
+# ROTA PARA SERVIR A LOGO
+@app.get("/logo.jpeg")
+def logo():
+    # logo.jpeg deve estar no mesmo diretório que server.py e dashboard.html
+    return send_from_directory(".", "logo.jpeg")
+
+
+# -------- ATIVOS (CRUD) --------
+@app.get("/ativos")
+def list_ativos():
+    return jsonify(
+        {"ativos": db.get("ativos", []), "ativo_atual_id": db.get("ativo_atual_id")}
+    )
+
+
+@app.post("/ativos")
+def add_ativo():
+    data = request.json or {}
+
+    nome = str(data.get("nome", "")).strip()
+    tipo = str(data.get("tipo", "lancha")).strip().lower()
+    imei = str(data.get("imei", "")).strip()
+    medida_base = str(data.get("medida_base", "hora")).strip().lower()
+    offset = float(data.get("offset", 0.0) or 0.0)
+
+    if not nome or not imei:
+        return jsonify({"erro": "nome e imei são obrigatórios"}), 400
+
+    if tipo not in ("lancha", "caminhao"):
+        tipo = "lancha"
+
+    if medida_base not in ("hora", "km"):
+        medida_base = "hora" if tipo == "lancha" else "km"
+
+    ativo = {
+        "id": uuid.uuid4().hex[:8],
+        "nome": nome,
+        "tipo": tipo,
+        "imei": imei,
+        "medida_base": medida_base,
+        "offset": offset,
+        "plano_preventivo": (
+            DEFAULT_PLANO_HORAS
+            if medida_base == "hora"
+            else DEFAULT_PLANO_KM
+        ),
+        "horas_base_total": 0.0,
+        "km_base_total": 0.0,
+        "paradas_state": {"last_ts": 0, "last_motor": False, "acc_s": 0},
+        "horas_totais": 0.0,
+        "horimetro_state": {"last_ts": 0, "last_motor": False},
+    }
+
+    db.setdefault("ativos", []).append(ativo)
+    if not db.get("ativo_atual_id"):
+        db["ativo_atual_id"] = ativo["id"]
+    ensure_defaults_for_ativo(ativo)
+    save_db(db)
+
+    return jsonify({"mensagem": "Ativo criado", "ativo": ativo})
+
+
+@app.put("/ativos/<ativo_id>")
+def update_ativo(ativo_id):
+    data = request.json or {}
+    for a in db.get("ativos", []):
+        if a["id"] == ativo_id:
+            a["nome"] = str(data.get("nome", a["nome"])).strip()
+            a["tipo"] = str(data.get("tipo", a["tipo"])).strip().lower()
+            a["imei"] = str(data.get("imei", a["imei"])).strip()
+            a["medida_base"] = str(
+                data.get("medida_base", a["medida_base"])
+            ).strip().lower()
+            a["offset"] = float(data.get("offset", a["offset"]) or 0.0)
+            ensure_defaults_for_ativo(a)
+            save_db(db)
+            return jsonify({"mensagem": "Ativo atualizado", "ativo": a})
+    return jsonify({"erro": "Ativo não encontrado"}), 404
+
+
+@app.delete("/ativos/<ativo_id>")
+def delete_ativo(ativo_id):
+    ativos = db.get("ativos", [])
+    novos = [a for a in ativos if a["id"] != ativo_id]
+    if len(novos) == len(ativos):
+        return jsonify({"erro": "Ativo não encontrado"}), 404
+
+    db["ativos"] = novos
+    if db.get("ativo_atual_id") == ativo_id:
+        db["ativo_atual_id"] = novos[0]["id"] if novos else None
+    save_db(db)
+    return jsonify({"mensagem": "Ativo removido"})
+
+
+@app.post("/ativos/<ativo_id>/selecionar")
+def selecionar_ativo(ativo_id):
+    for a in db.get("ativos", []):
+        if a["id"] == ativo_id:
+            db["ativo_atual_id"] = ativo_id
+            save_db(db)
+            return jsonify(
+                {"mensagem": "Ativo selecionado", "ativo_atual_id": ativo_id}
+            )
+    return jsonify({"erro": "Ativo não encontrado"}), 404
+
+
+# -------- DADOS (ativo atual) --------
+@app.get("/dados")
+def dados():
+    ativo = get_ativo_atual()
+    if not ativo:
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+
+    ensure_defaults_for_ativo(ativo)
+    bs = obter_dados_brasilsat_por_imei(ativo["imei"])
+
+    # Leitura da BrasilSat
+    horas_reais_brasilsat = bs["horas_reais"]
+    km_reais_brasilsat = bs["km_reais"]
+
+    # Offset por tipo de medida
+    if ativo["medida_base"] == "hora":
+        horas_paradas = atualizar_horas_paradas(
+            ativo, bs["servertime"], bs["motor_ligado"]
+        )
+        horas_totais = atualizar_horas_totais(
+            ativo, bs["servertime"], bs["motor_ligado"]
+        )
+
+        uso_base = horas_totais          # "hora da embarcação" (cumulativa)
+        unidade_base = "h"
+
+        payload = {
+            "ativo_id": ativo["id"],
+            "nome": ativo["nome"],
+            "tipo": ativo["tipo"],
+            "imei": bs["imei"],
+            "motor_ligado": bs["motor_ligado"],
+            "tensao_bateria": bs["tensao_bateria"],
+            "servertime": bs["servertime"],
+            "horas_reais_brasilsat": horas_reais_brasilsat,
+            "km_reais_brasilsat": km_reais_brasilsat,
+            "offset": ativo["offset"],
+            "horas_motor": horas_reais_brasilsat,   # ciclo atual (referência)
+            "uso_base": uso_base,
+            "unidade_base": unidade_base,
+            "medida_base": ativo["medida_base"],
+            "horas_paradas": horas_paradas,
+            "horas_totais": horas_totais,
+        }
+
+    else:
+        # medida_base = "km" (usa BrasilSat como odômetro)
+        km_ajustados = round(
+            km_reais_brasilsat + (ativo["offset"] or 0.0), 2
+        )
+        km_totais = round(
+            float(ativo.get("km_base_total", 0.0)) + km_ajustados, 2
+        )
+
+        horas_paradas = atualizar_horas_paradas(
+            ativo, bs["servertime"], bs["motor_ligado"]
+        )
+
+        uso_base = km_totais
+        unidade_base = "km"
+
+        payload = {
+            "ativo_id": ativo["id"],
+            "nome": ativo["nome"],
+            "tipo": ativo["tipo"],
+            "imei": bs["imei"],
+            "motor_ligado": bs["motor_ligado"],
+            "tensao_bateria": bs["tensao_bateria"],
+            "servertime": bs["servertime"],
+            "horas_reais_brasilsat": horas_reais_brasilsat,
+            "km_reais_brasilsat": km_reais_brasilsat,
+            "offset": ativo["offset"],
+            "km_total": km_ajustados,
+            "uso_base": uso_base,
+            "unidade_base": unidade_base,
+            "medida_base": ativo["medida_base"],
+            "horas_paradas": horas_paradas,
+            "km_totais": km_totais,
+            "km_base_total": float(ativo.get("km_base_total", 0.0)),
+        }
+
+    save_db(db)
+    return jsonify(payload)
+
+
+# -------- PREVENTIVA (ativo atual) --------
+@app.get("/preventiva")
+def preventiva():
+    ativo = get_ativo_atual()
+    if not ativo:
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+
+    ensure_defaults_for_ativo(ativo)
+    bs = obter_dados_brasilsat_por_imei(ativo["imei"])
+
+    if ativo["medida_base"] == "hora":
+        # usa horímetro cumulativo interno
+        uso_ajustado = atualizar_horas_totais(
+            ativo, bs["servertime"], bs["motor_ligado"]
+        )
+        unidade = "h"
+    else:
+        # usa odômetro da BrasilSat + offset
+        uso_ajustado = round(bs["km_reais"] + (ativo["offset"] or 0.0), 2)
+        unidade = "km"
+
+    tarefas = calcular_status_preventiva(uso_ajustado, ativo["plano_preventivo"])
+    save_db(db)
+
+    return jsonify(
+        {
+            "ativo_id": ativo["id"],
+            "nome": ativo["nome"],
+            "tipo": ativo["tipo"],
+            "imei": bs["imei"],
+            "uso_ajustado": uso_ajustado,
+            "unidade": unidade,
+            "tarefas": tarefas,
+        }
+    )
+
+
+# -------- CONFIG OFFSET (ativo atual) --------
+@app.post("/config/offset")
+def set_offset():
+    ativo = get_ativo_atual()
+    if not ativo:
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+
+    data = request.json or {}
+    valor = data.get("offset")
+    if valor is None:
+        return jsonify({"erro": "Envie offset no corpo JSON"}), 400
+    try:
+        valor = float(valor)
+    except Exception:
+        return jsonify({"erro": "offset deve ser número"}), 400
+
+    ativo["offset"] = valor
+    save_db(db)
+    return jsonify({"mensagem": "Offset atualizado", "novo_offset": valor})
+
+
+@app.get("/config/offset")
+def get_offset():
+    ativo = get_ativo_atual()
+    if not ativo:
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+    return jsonify(
+        {
+            "offset": ativo["offset"],
+            "nome": ativo["nome"],
+            "medida_base": ativo["medida_base"],
+        }
+    )
+
+
+# -------- CONFIG PLANO (ativo atual) --------
+@app.get("/config/plano")
+def get_plano():
+    ativo = get_ativo_atual()
+    if not ativo:
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+    ensure_defaults_for_ativo(ativo)
+    return jsonify(
+        {"plano": ativo["plano_preventivo"], "medida_base": ativo["medida_base"]}
+    )
+
+
+@app.post("/config/plano")
+def set_plano():
+    ativo = get_ativo_atual()
+    if not ativo:
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+
+    data = request.json or {}
+    plano = data.get("plano")
+    if not isinstance(plano, list):
+        return jsonify({"erro": "Envie 'plano' como lista"}), 400
+
+    novo = []
+    for item in plano:
+        try:
+            novo.append(
+                {
+                    "nome": str(item["nome"]),
+                    "unidade": str(
+                        item.get("unidade", ativo["medida_base"])
+                    ).lower(),
+                    "primeira_execucao": float(item["primeira_execucao"]),
+                    "intervalo": float(item["intervalo"]),
+                    "avisar_antes": float(item.get("avisar_antes", 10)),
+                }
+            )
+        except Exception:
+            return jsonify({"erro": f"Item inválido: {item}"}), 400
+
+    ativo["plano_preventivo"] = novo
+    save_db(db)
+    return jsonify({"mensagem": "Plano atualizado", "total_itens": len(novo)})
+
+
+# -------- CONFIG HORAS TOTAIS (ativo hora) --------
+@app.get("/config/horas_totais")
+def get_horas_totais():
+    ativo = get_ativo_atual()
+    if not ativo:
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+    ensure_defaults_for_ativo(ativo)
+
+    if ativo["medida_base"] != "hora":
+        return jsonify({"erro": "Ativo atual não é por horas"}), 400
+
+    bs = obter_dados_brasilsat_por_imei(ativo["imei"])
+    horas_totais = atualizar_horas_totais(
+        ativo, bs["servertime"], bs["motor_ligado"]
+    )
+    save_db(db)
+
+    return jsonify(
+        {
+            "horas_totais": horas_totais,
+            "horas_motor_atual": bs["horas_reais"],  # ciclo da BrasilSat
+        }
+    )
+
+
+@app.post("/config/horas_totais")
+def set_horas_totais():
+    """
+    Botão de ajuste do horímetro:
+    você informa o total desejado, e a partir daí ele continua somando.
+    """
+    ativo = get_ativo_atual()
+    if not ativo:
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+    ensure_defaults_for_ativo(ativo)
+
+    if ativo["medida_base"] != "hora":
+        return jsonify({"erro": "Ativo atual não é por horas"}), 400
+
+    data = request.json or {}
+    horas_totais = data.get("horas_totais")
+    if horas_totais is None:
+        return jsonify({"erro": "Envie horas_totais no corpo JSON"}), 400
+    try:
+        horas_totais = float(horas_totais)
+    except Exception:
+        return jsonify({"erro": "horas_totais deve ser número"}), 400
+
+    ativo["horas_totais"] = horas_totais
+    # reseta o estado do horímetro pra evitar somas erradas
+    ativo["horimetro_state"] = {"last_ts": 0, "last_motor": False}
+    save_db(db)
+
+    return jsonify(
+        {
+            "mensagem": "Horas totais ajustadas",
+            "horas_totais": horas_totais,
+        }
+    )
+
+
+# -------- CONFIG KM TOTAIS (ativo km) --------
+@app.get("/config/km_totais")
+def get_km_totais():
+    ativo = get_ativo_atual()
+    if not ativo:
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+    ensure_defaults_for_ativo(ativo)
+
+    if ativo["medida_base"] != "km":
+        return jsonify({"erro": "Ativo atual não é por km"}), 400
+
+    bs = obter_dados_brasilsat_por_imei(ativo["imei"])
+    km_ajustados = round(bs["km_reais"] + (ativo["offset"] or 0.0), 2)
+    km_totais = round(
+        float(ativo.get("km_base_total", 0.0)) + km_ajustados, 2
+    )
+
+    return jsonify(
+        {
+            "km_totais": km_totais,
+            "km_base_total": float(ativo.get("km_base_total", 0.0)),
+            "km_total_atual": km_ajustados,
+        }
+    )
+
+
+@app.post("/config/km_totais")
+def set_km_totais():
+    ativo = get_ativo_atual()
+    if not ativo:
+        bootstrap_db_if_needed()
+        ativo = get_ativo_atual()
+        if not ativo:
+            return jsonify({"erro": "Nenhum ativo cadastrado"}), 400
+    ensure_defaults_for_ativo(ativo)
+
+    if ativo["medida_base"] != "km":
+        return jsonify({"erro": "Ativo atual não é por km"}), 400
+
+    data = request.json or {}
+    km_totais = data.get("km_totais")
+    if km_totais is None:
+        return jsonify({"erro": "Envie km_totais no corpo JSON"}), 400
+    try:
+        km_totais = float(km_totais)
+    except Exception:
+        return jsonify({"erro": "km_totais deve ser número"}), 400
+
+    bs = obter_dados_brasilsat_por_imei(ativo["imei"])
+    km_ajustados = round(bs["km_reais"] + (ativo["offset"] or 0.0), 2)
+
+    ativo["km_base_total"] = round(km_totais - km_ajustados, 2)
+    save_db(db)
+
+    return jsonify(
+        {
+            "mensagem": "KM totais atualizados",
+            "km_totais": km_totais,
+            "km_base_total": float(ativo["km_base_total"]),
+        }
+    )
+
+
+# -------- CLIENTES (CADASTRO SIMPLES) --------
+@app.post("/api/clientes")
+def create_cliente():
+    """
+    Recebe os dados do formulário de cadastro.html e grava em clientes.json.
+    Campos obrigatórios: nome_proprietario e imei_motor (pra não salvar cadastro vazio).
+    """
+    data = request.json or {}
+
+    nome_prop = str(data.get("nome_proprietario", "")).strip()
+    imei_motor = str(data.get("imei_motor", "")).strip()
+
+    if not nome_prop or not imei_motor:
+        return jsonify(
+            {"erro": "nome_proprietario e imei_motor são obrigatórios"}
+        ), 400
+
+    cliente = {
+        "id": uuid.uuid4().hex[:8],
+        "created_at": int(time.time()),
+        **data,
+    }
+
+    clientes_db.setdefault("clientes", []).append(cliente)
+    save_clientes(clientes_db)
+
+    return jsonify(
+        {
+            "mensagem": "Cliente cadastrado com sucesso",
+            "cliente_id": cliente["id"],
+        }
+    )
+
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5000)
