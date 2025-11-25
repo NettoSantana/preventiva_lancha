@@ -16,13 +16,32 @@ BASE_URL = "https://gps.brasilsatgps.com.br"
 ACCOUNT = os.getenv("BRASILSAT_ACCOUNT", "nettosantana@icloud.com")
 PASSWORD = os.getenv("BRASILSAT_PASSWORD", "1234567")
 
+# --- CACHE DE TOKEN (evitar /authorization toda hora) ---
+TOKEN_CACHE = {
+    "token": None,
+    "expires_at": 0,  # epoch em segundos
+}
+
+# --- CACHE DE TRACK POR IMEI (evitar bater na BrasilSat toda hora) ---
+BRASILSAT_CACHE = {}
+BRASILSAT_TTL = 20  # segundos (atualização a cada 20s)
+
 
 def md5(s: str) -> str:
     return hashlib.md5(s.encode("utf-8")).hexdigest()
 
 
 def get_token():
+    """
+    Obtém token da BrasilSat com cache.
+    Só chama /api/authorization quando o token expirar.
+    """
     now = int(time.time())
+
+    # Se ainda está válido, reaproveita
+    if TOKEN_CACHE["token"] and now < TOKEN_CACHE["expires_at"]:
+        return TOKEN_CACHE["token"]
+
     signature = md5(md5(PASSWORD) + str(now))
     url = f"{BASE_URL}/api/authorization"
     r = requests.get(
@@ -34,7 +53,14 @@ def get_token():
     j = r.json()
     if j.get("code") != 0:
         raise RuntimeError(f"Auth falhou: {j}")
-    return j["record"]["access_token"]
+
+    token = j["record"]["access_token"]
+
+    # Chuto validade de 50 minutos pra não ficar sem renovar
+    TOKEN_CACHE["token"] = token
+    TOKEN_CACHE["expires_at"] = now + 50 * 60
+
+    return token
 
 
 def track(access_token: str, imei: str):
@@ -271,6 +297,16 @@ def calcular_status_preventiva(uso_ajustado: float, plano: list):
 
 
 def obter_dados_brasilsat_por_imei(imei: str):
+    """
+    Busca dados da BrasilSat, com cache de 20s por IMEI.
+    Isso reduz chamadas e evita Over TPS Limit.
+    """
+    now = time.time()
+    cached = BRASILSAT_CACHE.get(imei)
+    if cached and (now - cached["last_fetch"] < BRASILSAT_TTL):
+        return cached["data"]
+
+    # Busca "real" na BrasilSat
     token = get_token()
     data = track(token, imei)
 
@@ -280,7 +316,7 @@ def obter_dados_brasilsat_por_imei(imei: str):
     mileage_m = float(data.get("mileage") or 0)
     km_total = round(mileage_m / 1000.0, 2)
 
-    return {
+    result = {
         "imei": data.get("imei"),
         "motor_ligado": bool(int(data.get("accstatus") or 0)),
         "horas_reais": horas_reais,      # tempo do ciclo atual (BrasilSat)
@@ -288,6 +324,12 @@ def obter_dados_brasilsat_por_imei(imei: str):
         "tensao_bateria": float(data.get("externalpower") or 0),
         "servertime": int(data.get("servertime") or time.time()),
     }
+
+    BRASILSAT_CACHE[imei] = {
+        "last_fetch": now,
+        "data": result,
+    }
+    return result
 
 
 # =========================
