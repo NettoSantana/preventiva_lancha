@@ -1,5 +1,4 @@
-﻿feat: navegação painel/preventiva/clientes
+﻿fix: voltar dashboard para versão com Painel e Preventiva
 
-- adiciona botão Clientes no dashboard
-- inclui barra de navegação no cadastro.html
-- permite abrir Preventiva via hash #preventiva
+- restaurado layout antigo de cards
+- mantidas abas Painel/Preventiva
