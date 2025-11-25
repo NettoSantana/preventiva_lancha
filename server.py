@@ -362,6 +362,13 @@ def dashboard():
     return send_from_directory(".", "dashboard.html")
 
 
+# ROTA PARA SERVIR A LOGO
+@app.get("/logo.jpeg")
+def logo():
+    # logo.jpeg deve estar no mesmo diretório que server.py e dashboard.html
+    return send_from_directory(".", "logo.jpeg")
+
+
 # -------- ATIVOS (CRUD) --------
 @app.get("/ativos")
 def list_ativos():
