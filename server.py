@@ -76,9 +76,12 @@ def track(access_token: str, imei: str):
 
 
 # =========================
-#  "DB" SIMPLES EM JSON
+#  "DB" SIMPLES EM JSON (ATIVOS)
 # =========================
 DB_FILE = os.path.join(os.path.dirname(__file__), "db.json")
+
+# "DB" de clientes em arquivo separado
+CLIENTES_FILE = os.path.join(os.path.dirname(__file__), "clientes.json")
 
 DEFAULT_PLANO_HORAS = [
     {
@@ -159,7 +162,23 @@ def save_db(db):
         json.dump(db, f, ensure_ascii=False, indent=2)
 
 
+def load_clientes():
+    if not os.path.exists(CLIENTES_FILE):
+        return {"clientes": []}
+    try:
+        with open(CLIENTES_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"clientes": []}
+
+
+def save_clientes(data):
+    with open(CLIENTES_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
 db = load_db()
+clientes_db = load_clientes()
 
 
 def ensure_defaults_for_ativo(ativo):
@@ -397,7 +416,7 @@ def atualizar_horas_totais(ativo, servertime: int, motor_ligado: bool):
 
 
 # =========================
-#  ROTAS
+#  ROTAS BÁSICAS
 # =========================
 @app.get("/")
 def dashboard():
@@ -866,6 +885,40 @@ def set_km_totais():
             "mensagem": "KM totais atualizados",
             "km_totais": km_totais,
             "km_base_total": float(ativo["km_base_total"]),
+        }
+    )
+
+
+# -------- CLIENTES (CADASTRO SIMPLES) --------
+@app.post("/api/clientes")
+def create_cliente():
+    """
+    Recebe os dados do formulário de cadastro.html e grava em clientes.json.
+    Campos obrigatórios: nome_proprietario e imei_motor (pra não salvar cadastro vazio).
+    """
+    data = request.json or {}
+
+    nome_prop = str(data.get("nome_proprietario", "")).strip()
+    imei_motor = str(data.get("imei_motor", "")).strip()
+
+    if not nome_prop or not imei_motor:
+        return jsonify(
+            {"erro": "nome_proprietario e imei_motor são obrigatórios"}
+        ), 400
+
+    cliente = {
+        "id": uuid.uuid4().hex[:8],
+        "created_at": int(time.time()),
+        **data,
+    }
+
+    clientes_db.setdefault("clientes", []).append(cliente)
+    save_clientes(clientes_db)
+
+    return jsonify(
+        {
+            "mensagem": "Cliente cadastrado com sucesso",
+            "cliente_id": cliente["id"],
         }
     )
 
