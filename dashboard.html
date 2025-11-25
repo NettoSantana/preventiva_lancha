@@ -149,11 +149,10 @@
       </div>
     </div>
 
-    <!-- Próxima troca (vai virar “próximas atividades” depois) -->
+    <!-- PRÓXIMAS ATIVIDADES (via /preventiva) -->
     <div class="card col-4">
-      <h2>Próxima troca de óleo</h2>
-      <div class="kpi"><span id="restanteOleo">--</span> h</div>
-      <div class="muted">Ciclo padrão: 100h</div>
+      <h2>Próximas atividades</h2>
+      <div class="muted" id="proxAtividades">Carregando...</div>
     </div>
 
     <!-- Alertas -->
@@ -162,9 +161,7 @@
       <div id="alertas" class="muted">--</div>
     </div>
 
-    <!-- REMOVIDO: card do gráfico de tensão -->
-
-    <!-- Leituras recentes (mantido) -->
+    <!-- Leituras recentes -->
     <div class="card col-4">
       <div class="row">
         <h2 style="margin:0">Leituras recentes</h2>
@@ -237,6 +234,7 @@
   const ENDPOINT_DADOS = "/dados";
   const ENDPOINT_PLANO = "/config/plano";
   const ENDPOINT_OFFSET = "/config/offset";
+  const ENDPOINT_PREVENTIVA = "/preventiva";
   const MAX_POINTS = 60;
 
   // ===========================
@@ -314,8 +312,22 @@
   }
 
   async function refreshPainel(){
+    // DADOS GERAIS
     const r = await fetch(ENDPOINT_DADOS, {cache:"no-store"});
     const d = await r.json();
+
+    // PREVENTIVA (próximas atividades)
+    let tarefas = [];
+    let unidadePreventiva = "";
+    try {
+      const rPrev = await fetch(ENDPOINT_PREVENTIVA, {cache:"no-store"});
+      const p = await rPrev.json();
+      tarefas = Array.isArray(p.tarefas) ? p.tarefas : [];
+      unidadePreventiva = p.unidade || "";
+    } catch(e){
+      tarefas = [];
+      unidadePreventiva = "";
+    }
 
     document.getElementById("imei").textContent = d.imei || "--";
     document.getElementById("lastUpdate").textContent =
@@ -351,13 +363,23 @@
     badge.className = "badge " + cls;
     badge.textContent = tensaoLabel(v, ligado);
 
-    // Próxima troca de óleo (temporário, depois vamos ligar ao plano de preventiva)
-    const h = Number(d.horas_motor || 0);
-    const restante = 100 - (h % 100);
-    document.getElementById("restanteOleo").textContent = restante.toFixed(2);
+    // PRÓXIMAS ATIVIDADES (a partir da preventiva)
+    const elProx = document.getElementById("proxAtividades");
+    if (!tarefas.length) {
+      elProx.textContent = "Nenhuma atividade pendente cadastrada.";
+    } else {
+      // mostra as 3 primeiras, já vêm ordenadas pela API
+      const linhas = tarefas.slice(0, 3).map(t => {
+        const faltam = (typeof t.faltam === "number") ? t.faltam.toFixed(1) : t.faltam;
+        const status = t.status || "";
+        const unidade = unidadePreventiva || t.unidade || unit || "";
+        return `• ${t.nome} em ${faltam} ${unidade} (${status})`;
+      });
+      elProx.innerHTML = linhas.join("<br>");
+    }
 
+    // ALERTAS (mantidos para bateria / carga)
     const alerts = [];
-    if (restante < 10) alerts.push(`Troca de óleo em menos de ${restante.toFixed(1)}h.`);
     if (v < 12.0) alerts.push("Tensão baixa: agendar carga/teste de bateria.");
     if (ligado && v < 13.2) alerts.push("Motor ligado sem tensão de carga adequada.");
     setAlertas(alerts);
