@@ -1,1 +1,1 @@
-﻿deploy: suporte a horas totais, horas paradas e nova estrutura server
+﻿fix: atualização do servidor (versão corrigida do /dados)
