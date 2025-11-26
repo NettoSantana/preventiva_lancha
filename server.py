@@ -71,7 +71,7 @@ def track(access_token: str, imei: str):
     r.raise_for_status()
     j = r.json()
     if j.get("code") != 0:
-        raise.RuntimeError(f"Track falhou: {j}")
+        raise RuntimeError(f"Track falhou: {j}")
     return j["record"][0]
 
 

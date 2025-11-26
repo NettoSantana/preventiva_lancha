@@ -1,1 +1,1 @@
-﻿fix: rota painel_geral e remover html acidental do server.py
+﻿feat: refactor server.py (rotas HTML + API clientes + limpeza de sintaxe)
