@@ -71,7 +71,7 @@ def track(access_token: str, imei: str):
     r.raise_for_status()
     j = r.json()
     if j.get("code") != 0:
-        raise RuntimeError(f"Track falhou: {j}")
+        raise.RuntimeError(f"Track falhou: {j}")
     return j["record"][0]
 
 
@@ -416,30 +416,29 @@ def atualizar_horas_totais(ativo, servertime: int, motor_ligado: bool):
 
 
 # =========================
-#  ROTAS BÁSICAS
+#  ROTAS BÁSICAS (HTML)
 # =========================
 @app.get("/")
 def dashboard():
+    # painel interno técnico
     return send_from_directory(".", "dashboard.html")
 
 
-# NOVA ROTA: tela de cadastro de cliente
 @app.get("/cadastro")
 def cadastro():
-    # cadastro.html precisa estar na mesma pasta de server.py
+    # tela de cadastro de cliente
     return send_from_directory(".", "cadastro.html")
 
 
-# NOVA ROTA: painel geral (visão por cliente)
 @app.get("/painel_geral")
 def painel_geral():
+    # painel geral por cliente
     return send_from_directory(".", "painel_geral.html")
 
 
-# ROTA PARA SERVIR A LOGO
 @app.get("/logo.jpeg")
 def logo():
-    # logo.jpeg deve estar no mesmo diretório que server.py e dashboard.html
+    # logo compartilhada entre as telas
     return send_from_directory(".", "logo.jpeg")
 
 
@@ -478,9 +477,7 @@ def add_ativo():
         "medida_base": medida_base,
         "offset": offset,
         "plano_preventivo": (
-            DEFAULT_PLANO_HORAS
-            if medida_base == "hora"
-            else DEFAULT_PLANO_KM
+            DEFAULT_PLANO_HORAS if medida_base == "hora" else DEFAULT_PLANO_KM
         ),
         "horas_base_total": 0.0,
         "km_base_total": 0.0,
@@ -895,12 +892,12 @@ def set_km_totais():
     )
 
 
-# -------- CLIENTES (CADASTRO SIMPLES) --------
+# -------- CLIENTES (CADASTRO + LISTAGEM) --------
 @app.post("/api/clientes")
 def create_cliente():
     """
     Recebe os dados do formulário de cadastro.html e grava em clientes.json.
-    Campos obrigatórios: nome_proprietario e imei_motor (pra não salvar cadastro vazio).
+    Campos obrigatórios: nome_proprietario e imei_motor.
     """
     data = request.json or {}
 
@@ -927,6 +924,14 @@ def create_cliente():
             "cliente_id": cliente["id"],
         }
     )
+
+
+@app.get("/api/clientes")
+def list_clientes():
+    """
+    Endpoint usado pelo painel_geral.html para listar todos os clientes.
+    """
+    return jsonify({"clientes": clientes_db.get("clientes", [])})
 
 
 if __name__ == "__main__":

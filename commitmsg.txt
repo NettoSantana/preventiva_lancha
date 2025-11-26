@@ -1,1 +1,1 @@
-﻿feat: adiciona painel_geral e GET /api/clientes para integração do painel geral
+﻿fix: rota painel_geral e remover html acidental do server.py
